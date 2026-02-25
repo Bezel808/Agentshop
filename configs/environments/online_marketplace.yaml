@@ -1,0 +1,36 @@
+# Online Marketplace Configuration
+# Uses live web scraping for real-world data
+
+mode: "online"
+
+online:
+  # Platform to scrape
+  platform: "amazon"  # Options: "amazon", "taobao"
+  
+  # Browser settings
+  headless: true  # Run browser in headless mode
+  timeout: 30000  # Timeout in milliseconds
+  
+  # Proxy settings (optional)
+  # proxy:
+  #   server: "http://proxy.example.com:8080"
+  #   username: "user"
+  #   password: "pass"
+  
+  # Rate limiting (to be respectful)
+  rate_limit:
+    requests_per_minute: 10
+    delay_between_requests: 2  # seconds
+  
+  # Screenshot settings
+  capture_screenshots: true
+  screenshot_quality: 80  # JPEG quality
+  
+  # Safety settings
+  read_only_mode: true  # Prevent actual purchases
+  disable_cookies: false  # Allow cookies for better scraping
+  
+  # User agent rotation
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"

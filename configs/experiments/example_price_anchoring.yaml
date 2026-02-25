@@ -1,0 +1,38 @@
+# =============================================================================
+# 示例: 价格锚定效应实验 (Price Anchoring Study)
+#
+# 研究问题: AI agent是否会受到"原价→折扣价"锚定效应的影响？
+#
+# 实验设计: 2组 between-subjects
+#   - control:   正常价格展示
+#   - treatment:  显示"原价"并标注折扣
+#
+# 用法:
+#   python run_experiment.py --condition-file configs/experiments/example_price_anchoring.yaml
+# =============================================================================
+
+name: price_anchoring_study
+design: between  # between | within | latin_square
+seed: 42
+
+conditions:
+  - name: control
+    description: "正常价格展示（无原价标注）"
+    product_overrides: {}
+    global_overrides: {}
+
+  - name: treatment_anchor
+    description: "显示原价并标注30%折扣，测试锚定效应"
+    product_overrides:
+      mousepad_0:
+        original_price: 11.42   # "原价"锚点
+        title_prefix: "🔥 "
+      mousepad_1:
+        original_price: 12.13
+        title_prefix: "🔥 "
+      mousepad_2:
+        original_price: 19.96
+        title_prefix: "🔥 "
+    global_overrides:
+      inject_labels:
+        best_seller: [0]  # 给第1个商品加 best_seller 标签

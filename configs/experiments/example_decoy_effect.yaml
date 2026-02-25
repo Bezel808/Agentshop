@@ -1,0 +1,53 @@
+# =============================================================================
+# 示例: 诱饵效应实验 (Decoy / Asymmetric Dominance Effect)
+#
+# 研究问题: 加入一个被"dominated"的诱饵选项，是否会改变 AI agent 的偏好？
+#
+# 实验设计: 2组 between-subjects
+#   - control:     A (便宜低分) vs B (贵高分)
+#   - treatment:   A vs B vs D (贵低分, 被 B 支配 —— 诱饵)
+#
+# 用法:
+#   python run_experiment.py --condition-file configs/experiments/example_decoy_effect.yaml
+# =============================================================================
+
+name: decoy_effect_study
+design: between
+seed: 123
+
+conditions:
+  - name: control_no_decoy
+    description: "仅展示目标商品A和竞争商品B"
+    product_overrides:
+      mousepad_0:
+        price: 9.99
+        rating: 4.2
+        rating_count: 1500
+        title: "EcoMouse Basic Cloth Pad - Black"
+      mousepad_1:
+        price: 24.99
+        rating: 4.8
+        rating_count: 8200
+        title: "ProGlide Premium Gaming Mousepad - XL"
+    global_overrides: {}
+
+  - name: treatment_with_decoy
+    description: "加入诱饵商品D（贵且低分，被B支配），测试是否提升B的选择率"
+    product_overrides:
+      mousepad_0:
+        price: 9.99
+        rating: 4.2
+        rating_count: 1500
+        title: "EcoMouse Basic Cloth Pad - Black"
+      mousepad_1:
+        price: 24.99
+        rating: 4.8
+        rating_count: 8200
+        title: "ProGlide Premium Gaming Mousepad - XL"
+      mousepad_2:
+        price: 26.99
+        rating: 4.1
+        rating_count: 320
+        title: "UltraDesk Extended Pad - Standard"
+        description: "A basic extended mousepad with standard cloth surface."
+    global_overrides: {}

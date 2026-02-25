@@ -1,0 +1,101 @@
+[project]
+name = "aces-v2"
+version = "2.0.0"
+description = "Agent-Marketplace Interaction Framework for AI Research"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "ACES Research Team"}
+]
+
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+# LLM backends
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.18"]
+local = [
+    "transformers>=4.30",
+    "torch>=2.0",
+    "accelerate>=0.20",  # For device_map
+]
+
+# Online marketplace
+online = [
+    "playwright>=1.40",
+    "beautifulsoup4>=4.12",
+]
+
+# RAG system (LlamaIndex)
+rag = [
+    "llama-index>=0.9",
+    "llama-index-retrievers-bm25>=0.1",
+    "llama-index-embeddings-huggingface>=0.1",
+    "sentence-transformers>=2.2",
+]
+
+# Web server
+web = [
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+    "jinja2>=3.1",
+]
+
+# Analysis and visualization
+analysis = [
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+
+# Development
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "ruff>=0.1",
+    "mypy>=1.7",
+]
+
+# All dependencies
+all = [
+    "aces-v2[openai,anthropic,local,online,rag,web,analysis,dev]"
+]
+
+[project.urls]
+Homepage = "https://github.com/mycustomai/ACES"
+Repository = "https://github.com/mycustomai/ACES"
+Documentation = "https://github.com/mycustomai/ACES/tree/main/docs"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["aces*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+asyncio_mode = "auto"

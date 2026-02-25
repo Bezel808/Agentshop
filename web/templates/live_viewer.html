@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACES-v2 实时浏览器查看器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .main-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .browser-view {
+            flex: 3;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .browser-header {
+            background: #2a2a2a;
+            padding: 10px 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .url-bar {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .browser-screen {
+            flex: 1;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .browser-screen img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid #333;
+        }
+        
+        .placeholder {
+            color: #666;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        .sidebar {
+            flex: 1;
+            background: #1a1a1a;
+            border-left: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+        }
+        
+        .sidebar-header {
+            background: #2a2a2a;
+            padding: 15px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .activity-log {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .log-item {
+            background: #2a2a2a;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            font-size: 13px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .log-item.thinking {
+            border-left-color: #ffa726;
+        }
+        
+        .log-item.action {
+            border-left-color: #4caf50;
+        }
+        
+        .log-item.error {
+            border-left-color: #f44336;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .log-time {
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        
+        .log-content {
+            line-height: 1.4;
+        }
+        
+        .metrics {
+            background: #2a2a2a;
+            padding: 15px;
+            border-top: 1px solid #444;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .metric-label {
+            color: #888;
+        }
+        
+        .metric-value {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 左侧：浏览器视图 -->
+        <div class="browser-view">
+            <div class="browser-header">
+                <div class="status-indicator"></div>
+                <input type="text" class="url-bar" id="current-url" readonly value="等待连接...">
+            </div>
+            
+            <div class="browser-screen" id="browser-screen">
+                <div class="placeholder">
+                    等待 Agent 开始操作浏览器...<br>
+                    <small style="color: #888; margin-top: 10px; display: block;">
+                        Agent 会在服务器上运行，实时截图传输到这里显示
+                    </small>
+                </div>
+                
+                <div class="connection-status" id="connection-status">
+                    🔴 未连接
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：活动日志 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">🎯 Agent 活动日志</div>
+            </div>
+            
+            <div class="activity-log" id="activity-log">
+                <div class="log-item">
+                    <div class="log-time">等待中...</div>
+                    <div class="log-content">等待 Agent 开始运行</div>
+                </div>
+            </div>
+            
+            <div class="metrics">
+                <div class="metric-row">
+                    <span class="metric-label">运行时间</span>
+                    <span class="metric-value" id="metric-time">0s</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">操作次数</span>
+                    <span class="metric-value" id="metric-actions">0</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">当前步骤</span>
+                    <span class="metric-value" id="metric-step">等待</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let startTime = null;
+        let actionCount = 0;
+        
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/viewer`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket 已连接');
+                updateConnectionStatus('🟢 已连接');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket 断开，3秒后重连');
+                updateConnectionStatus('🔴 断开连接');
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        function handleMessage(data) {
+            switch(data.type) {
+                case 'screenshot':
+                    updateScreenshot(data.screenshot, data.url);
+                    break;
+                case 'log':
+                    addLog(data.level, data.message);
+                    break;
+                case 'metric':
+                    updateMetric(data.name, data.value);
+                    break;
+            }
+        }
+        
+        function updateScreenshot(screenshotData, url) {
+            const screen = document.getElementById('browser-screen');
+            screen.innerHTML = `<img src="${screenshotData}" alt="Browser Screenshot">`;
+            
+            if (url) {
+                document.getElementById('current-url').value = url;
+            }
+        }
+        
+        function addLog(level, message) {
+            const log = document.getElementById('activity-log');
+            
+            // 清除占位符
+            if (log.children.length === 1 && log.children[0].textContent.includes('等待')) {
+                log.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = `log-item ${level}`;
+            item.innerHTML = `
+                <div class="log-time">${new Date().toLocaleTimeString()}</div>
+                <div class="log-content">${message}</div>
+            `;
+            
+            log.appendChild(item);
+            log.scrollTop = log.scrollHeight;
+            
+            if (level === 'action') {
+                actionCount++;
+                document.getElementById('metric-actions').textContent = actionCount;
+            }
+        }
+        
+        function updateMetric(name, value) {
+            const el = document.getElementById(`metric-${name}`);
+            if (el) {
+                el.textContent = value;
+            }
+        }
+        
+        function updateConnectionStatus(status) {
+            document.getElementById('connection-status').textContent = status;
+        }
+        
+        setInterval(() => {
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                updateMetric('time', `${elapsed}s`);
+            }
+        }, 1000);
+        
+        connectWebSocket();
+    </script>
+</body>
+</html>

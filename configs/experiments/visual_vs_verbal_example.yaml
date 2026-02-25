@@ -1,0 +1,63 @@
+# Example Experiment Configuration
+# Compares visual vs verbal perception modes
+
+experiment_name: "visual_vs_verbal_comparison"
+description: "Test how perception mode affects agent decision-making"
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Maximum steps per episode
+max_steps: 10
+
+# Agent configuration
+agent:
+  llm:
+    backend: "openai"  # or "deepseek", "anthropic"
+    model: "gpt-4o"
+    temperature: 1.0
+    max_tokens: 1000
+  
+  perception:
+    mode: "visual"  # Switch to "verbal" for text-only mode
+    detail_level: "high"  # For visual mode
+    # format_style: "structured"  # For verbal mode
+  
+  tools:
+    - search_products
+    - view_product_details
+    - add_to_cart
+  
+  system_prompt: |
+    You are a helpful shopping assistant. Your goal is to help the user
+    find and purchase the best product for their needs.
+    
+    Always explain your reasoning before making a selection.
+
+# Environment configuration
+environment:
+  type: "ecommerce_marketplace"
+  
+  dataset:
+    source: "huggingface"
+    name: "My-Custom-AI/ACE-BB"
+    subset: "choice_behavior"
+  
+  initial_query: "laptop"
+  
+  settings:
+    num_products: 8
+    enable_screenshots: true  # For visual mode
+    
+# Evaluation metrics to track
+metrics:
+  - "decision_time"
+  - "selected_product_rank"
+  - "reasoning_quality"
+  - "tool_usage_count"
+
+# Metadata
+metadata:
+  researcher: "Your Name"
+  hypothesis: "Visual mode leads to position bias, verbal mode is more analytical"
+  date: "2026-01-26"

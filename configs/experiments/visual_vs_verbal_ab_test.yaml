@@ -1,0 +1,156 @@
+# Visual vs Verbal A/B Test Configuration
+#
+# This experiment tests whether perception mode (visual vs verbal)
+# affects agent decision-making behavior.
+#
+# Design:
+# - 100 trials total
+# - 50 trials with VISUAL perception
+# - 50 trials with VERBAL perception
+# - Same environment, same LLM, same task
+# - Measure: decision time, selected rank, reasoning quality
+
+experiment_id: "visual_vs_verbal_ab_test_2026_01"
+name: "Visual vs Verbal Perception A/B Test"
+description: |
+  Tests whether agents make different decisions when perceiving
+  products visually (screenshots) vs verbally (text/JSON).
+  
+  Hypothesis: Visual mode leads to stronger position bias,
+  verbal mode leads to more analytical decisions.
+
+# Execution settings
+num_trials: 100
+max_steps_per_trial: 10
+random_seed: 42
+
+# Output settings
+output_dir: "experiment_results"
+save_screenshots: true
+save_trajectories: true
+
+# ============================================================================
+# Agent Configuration
+# ============================================================================
+agent:
+  llm:
+    backend: "deepseek"  # Use DeepSeek for cost efficiency
+    model: "deepseek-chat"
+    temperature: 1.0
+    max_tokens: 1000
+  
+  # NOTE: Perception mode will be VARIED across trials
+  # - Trials 0-49: visual
+  # - Trials 50-99: verbal
+  perception:
+    mode: "visual"  # Default (will be overridden)
+    detail_level: "high"
+  
+  tools:
+    - search_products
+    - view_product_details
+    - add_to_cart
+  
+  system_prompt: |
+    You are a helpful shopping assistant. Your goal is to help the user
+    find and purchase the best mousepad for gaming.
+    
+    Instructions:
+    1. Carefully examine all available products
+    2. Consider price, rating, and features
+    3. Explain your reasoning before making a selection
+    4. Use add_to_cart when you've made your decision
+
+# ============================================================================
+# Environment Configuration
+# ============================================================================
+environment:
+  mode: "offline"  # Controlled sandbox for reproducibility
+  
+  offline:
+    datasets_dir: "../ACES/datasets"
+    screenshots_dir: "../ACES/screenshots"
+    default_query: "mousepad"
+    
+    # No interventions for baseline test
+    interventions: []
+
+# ============================================================================
+# Experimental Interventions (Applied Before Agent Starts)
+# ============================================================================
+interventions:
+  # Intervention 1: Shuffle positions to control for position bias
+  - type: "position_shuffle"
+    config:
+      seed: 42
+      apply_to_trials: "all"  # Apply to all trials
+  
+  # Intervention 2: For trials 50-99, switch to verbal mode
+  - type: "perception_mode_override"
+    config:
+      mode: "verbal"
+      format_style: "structured"
+      apply_to_trials: [50, 51, 52, ..., 99]  # Second half of trials
+
+# ============================================================================
+# Metrics to Calculate
+# ============================================================================
+metrics:
+  # Primary metrics (for hypothesis testing)
+  - decision_time              # Time to decide
+  - selected_product_rank      # Position of selected product
+  - reasoning_quality          # Quality of explanation
+  
+  # Secondary metrics (exploratory)
+  - tool_usage_count          # Number of tools used
+  - modality_usage            # Visual vs verbal usage
+  - price_sensitivity         # Did they choose cheap/expensive?
+
+# ============================================================================
+# Analysis Configuration
+# ============================================================================
+analysis:
+  # Statistical tests to run
+  tests:
+    - type: "t_test"
+      groups: ["visual", "verbal"]
+      metric: "decision_time"
+      hypothesis: "visual < verbal"  # Visual should be faster
+    
+    - type: "chi_square"
+      groups: ["visual", "verbal"]
+      metric: "selected_product_rank"
+      hypothesis: "visual shows position bias"
+  
+  # Visualization
+  plots:
+    - type: "box_plot"
+      x: "perception_mode"
+      y: "decision_time"
+      title: "Decision Time by Perception Mode"
+    
+    - type: "bar_chart"
+      x: "selected_product_rank"
+      hue: "perception_mode"
+      title: "Selected Product Rank Distribution"
+
+# ============================================================================
+# Metadata
+# ============================================================================
+metadata:
+  researcher: "Your Name"
+  institution: "Your University"
+  date_created: "2026-01-29"
+  
+  hypothesis: |
+    Visual perception mode will lead to:
+    1. Faster decisions (less cognitive load)
+    2. Stronger position bias (top-left products favored)
+    3. Less detailed reasoning
+    
+    Verbal perception mode will lead to:
+    1. Slower, more deliberate decisions
+    2. More analytical selection (less position bias)
+    3. More detailed reasoning
+  
+  expected_runtime: "~30 minutes (100 trials × ~20 seconds each)"

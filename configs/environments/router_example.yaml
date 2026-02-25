@@ -1,0 +1,50 @@
+# Marketplace Router Configuration
+# Demonstrates how to switch between offline and online modes
+
+# Environment variable: ENV_MODE=offline or ENV_MODE=online
+# This config file shows both configurations for reference
+
+# ============================================================================
+# OFFLINE MODE (Default for experiments)
+# ============================================================================
+default_mode: "offline"
+
+offline:
+  datasets_dir: "../ACES/datasets"
+  screenshots_dir: "../ACES/screenshots"
+  
+  # Research interventions
+  interventions:
+    - type: "title_enhancement"
+      config:
+        keywords: ["Premium", "Best Seller"]
+
+# ============================================================================
+# ONLINE MODE (For real-world validation)
+# ============================================================================
+online:
+  platform: "amazon"
+  headless: true
+  read_only_mode: true  # Safety first!
+  
+# ============================================================================
+# Comparison Experiments
+# ============================================================================
+# You can run the same agent in both modes to compare:
+# 1. Offline: Controlled, reproducible results
+# 2. Online: Real-world validation
+
+comparison:
+  run_both_modes: true
+  
+  # Metrics to compare
+  metrics:
+    - "selected_product_rank"
+    - "decision_time"
+    - "reasoning_consistency"
+  
+  # Hypothesis
+  hypothesis: |
+    Agent behavior should be consistent across modes, but:
+    - Offline mode: Faster, more consistent (due to interventions)
+    - Online mode: Slower, more variable (real-world complexity)

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{% if product %}{{ product.title[:60] }}...{% else %}Product{% endif %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .detail-back { margin-bottom: 16px; }
+        .detail-back a { color: #007185; text-decoration: none; }
+        .detail-back a:hover { text-decoration: underline; }
+        .detail-layout { max-width: 900px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .detail-top { display: flex; gap: 24px; margin-bottom: 24px; }
+        .detail-image { flex-shrink: 0; width: 280px; height: 280px; display: flex; align-items: center; justify-content: center; background: #f8f8f8; border-radius: 8px; overflow: hidden; }
+        .detail-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .detail-meta { flex-grow: 1; }
+        .detail-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
+        .detail-rating { font-size: 14px; margin-bottom: 8px; }
+        .detail-price { font-size: 24px; font-weight: 600; color: #B12704; margin-bottom: 16px; }
+        .detail-description { border-top: 1px solid #eee; padding-top: 20px; }
+        .detail-description h3 { font-size: 16px; margin-bottom: 10px; }
+        .detail-description .text { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #0F1111; }
+        .detail-description .empty { color: #888; font-style: italic; }
+        .detail-actions { margin-top: 20px; }
+        .detail-actions .add-to-cart { padding: 10px 24px; background: #FFD814; border: 1px solid #FCD200; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
+        .detail-actions .add-to-cart:hover { background: #F7CA00; }
+        .detail-error { padding: 40px; text-align: center; color: #666; }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="search-container">
+            <form action="/search" method="get" id="search-form">
+                <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products...">
+                <button type="submit"><span class="search-icon">🔍</span></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="detail-back" style="max-width: 900px; margin: 20px auto; padding: 0 20px;">
+        {% if query %}
+        <a href="/search?q={{ query | urlencode }}">← Back to search "{{ query }}"</a>
+        {% else %}
+        <a href="/search">← Back to search</a>
+        {% endif %}
+    </div>
+
+    {% if product %}
+    <div class="detail-layout">
+        <div class="detail-top">
+            <div class="detail-image">
+                {% if product.image_url %}
+                <img src="{{ product.image_url }}" alt="{{ product.title }}">
+                {% else %}
+                <div class="placeholder-image">📦</div>
+                {% endif %}
+            </div>
+            <div class="detail-meta">
+                <h1 class="detail-title">{{ product.title }}</h1>
+                <div class="detail-rating">
+                    {% set rating = product.rating|float %}
+                    {% if rating > 0 %}
+                        {% for _ in range(rating|int) %}<span class="star filled">★</span>{% endfor %}
+                        {% if (rating % 1) >= 0.5 %}<span class="star filled">★</span>{% endif %}
+                        {% for _ in range(5 - rating|round|int) %}<span class="star empty">☆</span>{% endfor %}
+                        <span class="rating-count">({{ product.rating_count }})</span>
+                    {% else %}
+                        <span class="no-rating">No ratings yet</span>
+                    {% endif %}
+                </div>
+                <div class="detail-price">${{ "%.2f"|format(product.price|float) }}</div>
+                <div class="detail-actions">
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+            </div>
+        </div>
+        <div class="detail-description">
+            <h3>Product Description</h3>
+            {% if product.description %}
+            <div class="text">{{ product.description }}</div>
+            {% else %}
+            <div class="text empty">No description available.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="detail-layout">
+        <div class="detail-error">
+            <p>Product not found or could not be loaded.</p>
+            <p><a href="/search">Back to search</a></p>
+        </div>
+    </div>
+    {% endif %}
+</body>
+
+</html>

@@ -1,0 +1,35 @@
+# Offline Marketplace Configuration
+# Uses local ACES datasets for controlled experiments
+
+mode: "offline"
+
+offline:
+  # Path to ACES datasets directory
+  datasets_dir: "../ACES/datasets"
+  
+  # Path to pre-rendered screenshots
+  screenshots_dir: "../ACES/screenshots"
+  
+  # Default query for testing
+  default_query: "mousepad"
+  
+  # Marketing interventions (for research)
+  interventions:
+    - type: "title_enhancement"
+      config:
+        keywords:
+          - "Premium"
+          - "Best Choice"
+          - "Recommended"
+        apply_probability: 0.3  # Apply to 30% of products
+    
+    - type: "price_anchoring"
+      config:
+        discount_pct: 0.25  # Show 25% "discount"
+        apply_to_sponsored: true  # Only apply to sponsored products
+  
+  # Experiment settings
+  experiment:
+    seed: 42  # For reproducibility
+    num_products_per_query: 8
+    enable_position_shuffling: false  # Keep original positions

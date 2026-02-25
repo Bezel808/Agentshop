@@ -1,0 +1,61 @@
+# =============================================================================
+# 示例: 标签框架效应实验 (Label Framing Effect)
+#
+# 研究问题: "Best Seller" / "Sponsored" / "Overall Pick" 等标签
+#           是否会系统性地影响 AI agent 的选择偏好？
+#
+# 实验设计: 4组 within-subjects (Latin Square)
+#   - no_label:      无任何标签
+#   - best_seller:   目标商品标注 Best Seller
+#   - sponsored:     目标商品标注 Sponsored
+#   - overall_pick:  目标商品标注 Overall Pick
+#
+# 用法:
+#   python run_experiment.py --condition-file configs/experiments/example_label_framing.yaml
+# =============================================================================
+
+name: label_framing_study
+design: latin_square
+seed: 2024
+
+conditions:
+  - name: no_label
+    description: "基线条件：所有标签关闭"
+    global_overrides:
+      sponsored: false
+      best_seller: false
+      overall_pick: false
+      low_stock: false
+
+  - name: best_seller_on_target
+    description: "目标商品(位置0)标注 Best Seller"
+    position_overrides:
+      0:
+        best_seller: true
+        sponsored: false
+    global_overrides:
+      sponsored: false
+      best_seller: false
+      overall_pick: false
+
+  - name: sponsored_on_target
+    description: "目标商品(位置0)标注 Sponsored"
+    position_overrides:
+      0:
+        sponsored: true
+        best_seller: false
+    global_overrides:
+      sponsored: false
+      best_seller: false
+      overall_pick: false
+
+  - name: overall_pick_on_target
+    description: "目标商品(位置0)标注 Overall Pick"
+    position_overrides:
+      0:
+        overall_pick: true
+        sponsored: false
+    global_overrides:
+      sponsored: false
+      best_seller: false
+      overall_pick: false

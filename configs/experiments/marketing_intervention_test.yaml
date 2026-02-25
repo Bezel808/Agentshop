@@ -1,0 +1,157 @@
+# Marketing Intervention Experiment
+#
+# Tests how marketing interventions (keyword injection, price anchoring)
+# affect agent purchasing decisions.
+#
+# Design:
+# - 200 trials total
+# - 50 control (no interventions)
+# - 50 keyword injection ("Premium", "Best Choice")
+# - 50 price anchoring (fake discounts)
+# - 50 combined (keywords + anchoring)
+
+experiment_id: "marketing_intervention_test_2026_01"
+name: "Marketing Intervention Effect on Agent Decisions"
+description: |
+  Tests whether AI agents are susceptible to marketing interventions
+  similar to human consumers.
+
+# Execution
+num_trials: 200
+max_steps_per_trial: 10
+random_seed: 123
+
+# Output
+output_dir: "experiment_results"
+save_screenshots: true
+save_trajectories: true
+
+# ============================================================================
+# Agent Configuration
+# ============================================================================
+agent:
+  llm:
+    backend: "deepseek"
+    model: "deepseek-chat"
+    temperature: 1.0
+  
+  perception:
+    mode: "verbal"  # Use verbal to isolate intervention effects
+    format_style: "structured"
+  
+  tools:
+    - search_products
+    - add_to_cart
+  
+  system_prompt: |
+    You are a shopping assistant. Help the user find a good mousepad.
+    Select the best product based on value for money.
+
+# ============================================================================
+# Environment
+# ============================================================================
+environment:
+  mode: "offline"
+  
+  offline:
+    datasets_dir: "../ACES/datasets"
+    default_query: "mousepad"
+    
+    # Base interventions (will be combined with trial-specific ones)
+    interventions: []
+
+# ============================================================================
+# Experimental Conditions (Trial-Level Interventions)
+# ============================================================================
+interventions:
+  # Group 1: Control (trials 0-49)
+  # No interventions - baseline behavior
+  
+  # Group 2: Keyword injection (trials 50-99)
+  - type: "keyword_injection"
+    config:
+      keywords: ["Premium", "Best Choice", "Top Rated"]
+      target_product_criteria:
+        position: 2  # Inject into 3rd product (not top, to test effect)
+      apply_to_trials: [50, 51, 52, ..., 99]
+  
+  # Group 3: Price anchoring (trials 100-149)
+  - type: "price_manipulation"
+    config:
+      manipulation_type: "anchor"
+      target_product: 2
+      price_multiplier: 1.5  # Make one product 50% more expensive
+      apply_to_trials: [100, 101, 102, ..., 149]
+  
+  # Group 4: Combined intervention (trials 150-199)
+  - type: "keyword_injection"
+    config:
+      keywords: ["Premium"]
+      target_product_criteria: {position: 2}
+      apply_to_trials: [150, 151, 152, ..., 199]
+  
+  - type: "price_manipulation"
+    config:
+      manipulation_type: "anchor"
+      target_product: 2
+      price_multiplier: 1.5
+      apply_to_trials: [150, 151, 152, ..., 199]
+
+# ============================================================================
+# Metrics
+# ============================================================================
+metrics:
+  - selected_product_rank     # Did intervention change selection?
+  - decision_time
+  - price_sensitivity
+  - reasoning_quality
+
+# ============================================================================
+# Analysis Plan
+# ============================================================================
+analysis:
+  # Compare groups
+  comparisons:
+    - name: "control_vs_keywords"
+      group_a: {trials: [0, 49]}
+      group_b: {trials: [50, 99]}
+      metric: "selected_product_rank"
+      test: "chi_square"
+    
+    - name: "control_vs_anchoring"
+      group_a: {trials: [0, 49]}
+      group_b: {trials: [100, 149]}
+      metric: "selected_product_rank"
+      test: "chi_square"
+    
+    - name: "keywords_vs_combined"
+      group_a: {trials: [50, 99]}
+      group_b: {trials: [150, 199]}
+      metric: "selected_product_rank"
+      test: "chi_square"
+  
+  # Hypothesis
+  hypotheses:
+    - "Keyword injection increases selection probability of target product by >20%"
+    - "Price anchoring creates decoy effect (avoidance of high-priced item)"
+    - "Combined interventions have additive effect"
+
+# ============================================================================
+# Metadata
+# ============================================================================
+metadata:
+  research_question: |
+    Are AI shopping agents susceptible to the same marketing tactics
+    that work on human consumers?
+  
+  expected_findings: |
+    If agents are susceptible:
+    - Control: ~12.5% selection rate for position 2 (1/8 products)
+    - Keywords: ~25-30% selection rate (2x baseline)
+    - Anchoring: <10% selection rate (avoidance)
+  
+  implications: |
+    If interventions work:
+    - Sellers can optimize for AI agents (new GEO strategies)
+    - Platforms may need to regulate AI-targeted marketing
+    - Consumer protection concerns in AI-mediated shopping

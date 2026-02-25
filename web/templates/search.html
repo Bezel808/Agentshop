@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{% if query %}{{ query }} - {% endif %}Product Search</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <div class="header">
+        <div class="search-container">
+            <form action="/search" method="get" id="search-form">
+                <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products..." autofocus>
+                <button type="submit">
+                    <span class="search-icon">🔍</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if query %}
+    <div class="search-info">
+        <p>Search results for: <strong>{{ query }}</strong></p>
+        {% if products %}
+        <p class="result-count">{{ products|length }} products found</p>
+        {% else %}
+        <p class="result-count">No products found</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if products %}
+    <div class="results-container">
+        {% for product in products %}
+        <div class="product-card">
+            <!-- 标签徽章 -->
+            <div class="product-badges">
+                {% if loop.index == 1 %}
+                <span class="badge bestseller">Best Seller</span>
+                {% endif %}
+                {% if loop.index == 2 %}
+                <span class="badge choice">Amazon's Choice</span>
+                {% endif %}
+                {% if loop.index <= 3 and product.price < 10 %}
+                <span class="badge deal">Limited Time Deal</span>
+                {% endif %}
+            </div>
+            <a href="/product/{{ product.id }}?q={{ query | urlencode }}" class="product-card-link" style="text-decoration:none;color:inherit;display:block;">
+            <div class="product-image">
+                {% if product.image_url %}
+                <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy">
+                {% else %}
+                <div class="placeholder-image">📦</div>
+                {% endif %}
+            </div>
+            <div class="product-info">
+                <h2 class="product-title">{{ product.title }}</h2>
+                <div class="product-rating">
+                    {% set rating = product.rating|float %}
+                    {% if rating > 0 %}
+                        {% for _ in range(rating|int) %}
+                        <span class="star filled">★</span>
+                        {% endfor %}
+                        {% if (rating % 1) >= 0.5 %}
+                        <span class="star filled">★</span>
+                        {% endif %}
+                        {% for _ in range(5 - rating|round|int) %}
+                        <span class="star empty">☆</span>
+                        {% endfor %}
+                        <span class="rating-count">({{ product.rating_count }})</span>
+                    {% else %}
+                        <span class="no-rating">No ratings yet</span>
+                    {% endif %}
+                </div>
+                <div class="product-price">${{ "%.2f"|format(product.price|float) }}</div>
+            </div>
+            </a>
+            <div class="add-to-cart-section">
+                <button class="add-to-cart">Add to Cart</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif query %}
+    <div class="no-results">
+        <p>😢 No products found for "{{ query }}"</p>
+        <p>Try searching for: mousepad, toothpaste, usb cable, etc.</p>
+    </div>
+    {% else %}
+    <div class="welcome">
+        <h1>Welcome to Product Search</h1>
+        <p>Search for products using the search bar above</p>
+        <div class="suggestions">
+            <p>Try searching for:</p>
+            <ul>
+                <li>mousepad</li>
+                <li>toothpaste</li>
+                <li>usb_cable</li>
+                <li>fitness_watch</li>
+                <li>office_lamp</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</body>
+
+</html>
