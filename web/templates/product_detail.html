@@ -17,6 +17,7 @@
         .detail-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
         .detail-rating { font-size: 14px; margin-bottom: 8px; }
         .detail-price { font-size: 24px; font-weight: 600; color: #B12704; margin-bottom: 16px; }
+        .detail-badges { margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
         .detail-description { border-top: 1px solid #eee; padding-top: 20px; }
         .detail-description h3 { font-size: 16px; margin-bottom: 10px; }
         .detail-description .text { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #0F1111; }
@@ -29,10 +30,18 @@
 </head>
 
 <body>
+    {% set cond_qs = "" %}
+    {% for k, v in (condition_params or {}).items() %}
+        {% set cond_qs = cond_qs ~ "&" ~ k ~ "=" ~ v %}
+    {% endfor %}
+
     <div class="header">
         <div class="search-container">
             <form action="/search" method="get" id="search-form">
                 <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products...">
+                {% for k, v in (condition_params or {}).items() %}
+                <input type="hidden" name="{{ k }}" value="{{ v }}">
+                {% endfor %}
                 <button type="submit"><span class="search-icon">🔍</span></button>
             </form>
         </div>
@@ -40,7 +49,7 @@
 
     <div class="detail-back" style="max-width: 900px; margin: 20px auto; padding: 0 20px;">
         {% if query %}
-        <a href="/search?q={{ query | urlencode }}">← Back to search "{{ query }}"</a>
+        <a href="/search?q={{ query | urlencode }}{{ cond_qs }}">← Back to search "{{ query }}"</a>
         {% else %}
         <a href="/search">← Back to search</a>
         {% endif %}
@@ -58,6 +67,25 @@
             </div>
             <div class="detail-meta">
                 <h1 class="detail-title">{{ product.title }}</h1>
+
+                <div class="detail-badges">
+                    {% if product.best_seller %}
+                    <span class="badge bestseller">Best Seller</span>
+                    {% endif %}
+                    {% if product.overall_pick %}
+                    <span class="badge choice">Overall Pick</span>
+                    {% endif %}
+                    {% if product.sponsored %}
+                    <span class="badge sponsored">Sponsored</span>
+                    {% endif %}
+                    {% if product.low_stock %}
+                    <span class="badge deal">Only a few left</span>
+                    {% endif %}
+                    {% for cb in (product.custom_badges or []) %}
+                    <span class="badge custom">{{ cb }}</span>
+                    {% endfor %}
+                </div>
+
                 <div class="detail-rating">
                     {% set rating = product.rating|float %}
                     {% if rating > 0 %}
@@ -69,7 +97,12 @@
                         <span class="no-rating">No ratings yet</span>
                     {% endif %}
                 </div>
-                <div class="detail-price">${{ "%.2f"|format(product.price|float) }}</div>
+                <div class="detail-price">
+                    {% if product.original_price %}
+                    <span class="original-price">${{ "%.2f"|format(product.original_price|float) }}</span>
+                    {% endif %}
+                    ${{ "%.2f"|format(product.price|float) }}
+                </div>
                 <div class="detail-actions">
                     <button class="add-to-cart">Add to Cart</button>
                 </div>

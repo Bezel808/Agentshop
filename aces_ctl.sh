@@ -45,10 +45,13 @@ _head()  { echo -e "\n${BOLD}${CYAN}$*${NC}"; }
 _is_running() { pgrep -f "$PROCESS_MARK" > /dev/null 2>&1; }
 
 _wait_healthy() {
-    local timeout=${1:-30}
+    local timeout=${1:-${ACES_START_TIMEOUT:-90}}
     for (( i=1; i<=timeout; i++ )); do
         if curl -sf "http://localhost:${PORT}/health" > /dev/null 2>&1; then
             return 0
+        fi
+        if [[ $((i % 10)) -eq 0 ]]; then
+            _info "  等待中... ${i}s/${timeout}s (构建索引/加载模型可能需要 1-2 分钟)"
         fi
         sleep 1
     done
@@ -91,14 +94,15 @@ cmd_start() {
         $extra_args \
         >> "$LOG_FILE" 2>&1 &
 
-    _info "正在启动 (构建索引可能需要 10-20 秒)..."
+    _info "正在启动 (LlamaIndex 建索引+加载模型约 30-90 秒，首次可能更久)..."
 
-    if _wait_healthy 30; then
+    if _wait_healthy 90; then
         _info "服务已就绪!"
         echo ""
         _print_access_info
     else
         _err "启动超时，查看日志: tail -50 $LOG_FILE"
+        _info "若首次启动慢，可尝试: ACES_SIMPLE_SEARCH=1 ./aces_ctl.sh start (跳过 RAG，秒启)"
         return 1
     fi
 }
@@ -281,7 +285,8 @@ cmd_help() {
     echo "  ACES_HOST          监听地址 (默认: 0.0.0.0)"
     echo "  ACES_DATASETS      数据集目录 (默认: datasets_unified)"
     echo "  ACES_LOG           日志文件 (默认: /tmp/aces_web_server.log)"
-    echo "  ACES_SIMPLE_SEARCH 设为1则禁用 LlamaIndex RAG"
+    echo "  ACES_SIMPLE_SEARCH 设为1则禁用 LlamaIndex RAG
+  ACES_START_TIMEOUT 健康检查等待秒数 (默认: 90)"
     echo ""
     echo "示例:"
     echo "  ./aces_ctl.sh start                          # 启动服务"

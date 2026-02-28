@@ -251,10 +251,34 @@ class ExperimentCondition:
             p.position = new_pos
             result.append(p)
 
-        logger.info(
-            f"Applied condition '{self.name}' to {len(result)} products"
-        )
+            logger.info(
+                f"Applied condition '{self.name}' to {len(result)} products"
+            )
         return result
+
+    def apply_single_product(self, product: Product) -> Product:
+        """
+        Apply overrides to a single product (e.g. for detail page).
+        Uses global_overrides + product_overrides only (no position/shuffle).
+        """
+        import copy
+        rng = random.Random(self.seed)
+        p = copy.deepcopy(product)
+
+        # 1) Global overrides
+        global_ov = {
+            k: v for k, v in self.global_overrides.items()
+            if k not in ("inject_labels", "shuffle_seed")
+        }
+        if global_ov:
+            p = self._apply_override(p, ProductOverride.from_dict(global_ov), rng)
+
+        # 2) Per-product overrides (by id)
+        if p.id in self.product_overrides:
+            ov = ProductOverride.from_dict(self.product_overrides[p.id])
+            p = self._apply_override(p, ov, rng)
+
+        return p
 
     def to_dict(self) -> Dict[str, Any]:
         return {

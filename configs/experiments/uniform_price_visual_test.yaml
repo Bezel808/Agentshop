@@ -1,0 +1,17 @@
+name: uniform_price_visual_test
+design: between
+seed: 42
+
+conditions:
+  - name: control
+    description: "基线：不修改任何商品属性"
+    global_overrides: {}
+
+  - name: uniform_price
+    description: "所有商品统一价格 $9.99，去除所有标签，纯视觉决策"
+    global_overrides:
+      price: 9.99
+      sponsored: false
+      best_seller: false
+      overall_pick: false
+      low_stock: false

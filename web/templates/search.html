@@ -12,6 +12,9 @@
         <div class="search-container">
             <form action="/search" method="get" id="search-form">
                 <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products..." autofocus>
+                {% for k, v in (condition_params or {}).items() %}
+                <input type="hidden" name="{{ k }}" value="{{ v }}">
+                {% endfor %}
                 <button type="submit">
                     <span class="search-icon">🔍</span>
                 </button>
@@ -30,23 +33,33 @@
     </div>
     {% endif %}
 
+    {% set cond_qs = "" %}
+    {% for k, v in (condition_params or {}).items() %}
+        {% set cond_qs = cond_qs ~ "&" ~ k ~ "=" ~ v %}
+    {% endfor %}
+
     {% if products %}
     <div class="results-container">
         {% for product in products %}
         <div class="product-card">
-            <!-- 标签徽章 -->
             <div class="product-badges">
-                {% if loop.index == 1 %}
+                {% if product.best_seller %}
                 <span class="badge bestseller">Best Seller</span>
                 {% endif %}
-                {% if loop.index == 2 %}
-                <span class="badge choice">Amazon's Choice</span>
+                {% if product.overall_pick %}
+                <span class="badge choice">Overall Pick</span>
                 {% endif %}
-                {% if loop.index <= 3 and product.price < 10 %}
-                <span class="badge deal">Limited Time Deal</span>
+                {% if product.sponsored %}
+                <span class="badge sponsored">Sponsored</span>
                 {% endif %}
+                {% if product.low_stock %}
+                <span class="badge deal">Only a few left</span>
+                {% endif %}
+                {% for cb in (product.custom_badges or []) %}
+                <span class="badge custom">{{ cb }}</span>
+                {% endfor %}
             </div>
-            <a href="/product/{{ product.id }}?q={{ query | urlencode }}" class="product-card-link" style="text-decoration:none;color:inherit;display:block;">
+            <a href="/product/{{ product.id }}?q={{ query | urlencode }}{{ cond_qs }}" class="product-card-link" style="text-decoration:none;color:inherit;display:block;">
             <div class="product-image">
                 {% if product.image_url %}
                 <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy">
@@ -73,7 +86,12 @@
                         <span class="no-rating">No ratings yet</span>
                     {% endif %}
                 </div>
-                <div class="product-price">${{ "%.2f"|format(product.price|float) }}</div>
+                <div class="product-price">
+                    {% if product.original_price %}
+                    <span class="original-price">${{ "%.2f"|format(product.original_price|float) }}</span>
+                    {% endif %}
+                    ${{ "%.2f"|format(product.price|float) }}
+                </div>
             </div>
             </a>
             <div class="add-to-cart-section">

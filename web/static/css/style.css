@@ -272,6 +272,20 @@ body {
     border: 1px solid #d5d9d9;
 }
 
+.badge.custom {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: #888;
+    font-size: 0.75em;
+    font-weight: 400;
+    margin-right: 6px;
+}
+
 /* No results */
 .no-results {
     max-width: 600px;
