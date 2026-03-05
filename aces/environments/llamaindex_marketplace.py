@@ -143,40 +143,52 @@ class LlamaIndexMarketplace(MarketplaceProvider):
             f"  Reranker: {reranker_model if use_reranker else 'None'}"
         )
     
+    def _apply_price_rating_filter(
+        self,
+        products: List[Product],
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
+    ) -> List[Product]:
+        """Filter products by price and rating."""
+        out = []
+        for p in products:
+            if price_min is not None and (p.price or 0) < price_min:
+                continue
+            if price_max is not None and (p.price or 0) > price_max:
+                continue
+            r = getattr(p, "rating", None) or 0
+            if rating_min is not None and r < rating_min:
+                continue
+            out.append(p)
+        return out
+
     def search_products(
         self,
         query: str,
         sort_by: str = "relevance",
         limit: int = 10,
+        page: int = 1,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
         **kwargs
     ) -> SearchResult:
         """
-        使用 Hybrid Retrieval + Reranking 搜索商品。
-        
-        Pipeline:
-        1. BM25 Retrieval (50 candidates)
-        2. Vector Retrieval (50 candidates)
-        3. Reciprocal Rank Fusion (merge to ~80 candidates)
-        4. Neural Reranking (re-score)
-        5. Return top-k
+        使用 Hybrid Retrieval + Reranking 搜索商品。支持翻页与价格/星级筛选。
         """
         self.current_query = query
-        
-        logger.info(f"Searching: '{query}' (limit={limit})")
-        
-        # Stage 1: BM25 Retrieval
+        page = max(1, page)
+        page_size = limit
+        fetch_limit = max(limit * 10, page * page_size)
+
+        logger.info(f"Searching: '{query}' (limit={fetch_limit})")
+
+        # Stage 1-3: BM25 + Vector + RRF
         bm25_nodes = self.bm25_retriever.retrieve(query)
-        logger.info(f"BM25 retrieved {len(bm25_nodes)} candidates")
-        
-        # Stage 2: Vector Retrieval
         vector_nodes = self.vector_retriever.retrieve(query)
-        logger.info(f"Vector retrieved {len(vector_nodes)} candidates")
-        
-        # Stage 3: Reciprocal Rank Fusion (manual)
         nodes = self._reciprocal_rank_fusion(bm25_nodes, vector_nodes)
-        logger.info(f"RRF fusion: {len(nodes)} candidates")
-        
-        # 提取商品（按出现顺序去重，同一 product_id 只保留第一次）
+
         seen_ids = set()
         candidate_products = []
         for node in nodes:
@@ -184,51 +196,49 @@ class LlamaIndexMarketplace(MarketplaceProvider):
             if product_id and product_id in self.product_lookup and product_id not in seen_ids:
                 seen_ids.add(product_id)
                 candidate_products.append(self.product_lookup[product_id])
-        
-        # Stage 4: Neural Reranking
+
+        # Stage 4: Reranking
         if self.reranker and len(candidate_products) > 0:
-            logger.info(f"Reranking {len(candidate_products)} products...")
-            
-            # 创建查询-商品对
-            pairs = [
-                (query, f"{p.title} {p.description or ''}")
-                for p in candidate_products
-            ]
-            
-            # 重排序打分
+            pairs = [(query, f"{p.title} {p.description or ''}") for p in candidate_products]
             rerank_scores = self.reranker.predict(pairs)
-            
-            # 按分数排序
             sorted_products = [
-                p for p, score in sorted(
+                p for p, _ in sorted(
                     zip(candidate_products, rerank_scores),
                     key=lambda x: x[1],
                     reverse=True
                 )
             ]
-            
-            products = sorted_products[:limit]
-            logger.info(f"After reranking, top score: {max(rerank_scores):.4f}")
         else:
-            # 无重排序，直接返回
-            products = candidate_products[:limit]
-        
-        # 应用排序（如果指定）
+            sorted_products = candidate_products
+
+        # Apply price/rating filter
+        sorted_products = self._apply_price_rating_filter(
+            sorted_products, price_min=price_min, price_max=price_max, rating_min=rating_min
+        )
+
+        # Apply sort
         if sort_by != "relevance":
-            products = self._sort_products(products, sort_by)
-        
-        # 更新位置
+            sorted_products = self._sort_products(sorted_products, sort_by)
+
+        total_count = len(sorted_products)
+        total_pages = max(1, (total_count + page_size - 1) // page_size) if total_count else 1
+        page = min(page, total_pages)
+        start = (page - 1) * page_size
+        products = sorted_products[start : start + page_size]
+
         for i, p in enumerate(products):
-            p.position = i
-        
+            p.position = start + i
+
         self.current_results = products
-        
-        logger.info(f"Final results: {len(products)} products")
-        
+
+        logger.info(f"Final results: page {page}/{total_pages}, {len(products)} products")
+
         return SearchResult(
             query=query,
             products=products,
-            total_count=len(candidate_products),
+            total_count=total_count,
+            page=page,
+            total_pages=total_pages,
             metadata={
                 "retrieval": "hybrid",
                 "fusion": "reciprocal_rank",
@@ -332,21 +342,11 @@ class LlamaIndexMarketplace(MarketplaceProvider):
         documents = []
         
         for product in self.products:
-            # 组合商品信息为文本
-            text = f"""
-Product: {product.title}
-
-Price: ${product.price:.2f}
-Rating: {product.rating}/5 ({product.rating_count} reviews)
-
-{product.description or ''}
-
-Tags: {', '.join([
-    'Sponsored' if product.sponsored else '',
-    'Best Seller' if product.best_seller else '',
-    'Overall Pick' if product.overall_pick else '',
-]).strip(', ')}
-""".strip()
+            # 仅使用标题和描述做 embedding（更接近真实电商做法）
+            parts = [product.title or ""]
+            if product.description:
+                parts.append(product.description)
+            text = "\n\n".join(p for p in parts if p.strip()).strip() or product.title or "Unknown"
             
             # 创建 Document
             doc = Document(

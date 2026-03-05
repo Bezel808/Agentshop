@@ -38,6 +38,10 @@ class LiveBrowserAgent:
         user_query: str = "mousepad",
         condition_name: str = None,
         stay_open: bool = True,
+        page: int = 1,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
     ):
         self.web_server_url = web_server_url
         self.user_query = user_query
@@ -45,6 +49,10 @@ class LiveBrowserAgent:
         self.perception_mode = perception_mode
         self.stay_open = stay_open
         self.search_keywords: Optional[str] = None
+        self.page = page
+        self.price_min = price_min
+        self.price_max = price_max
+        self.rating_min = rating_min
         
         if llm_backend == "qwen":
             if perception_mode == "visual":
@@ -93,12 +101,25 @@ class LiveBrowserAgent:
             "url": url
         })
     
-    def _build_search_url(self, keywords: str) -> str:
-        """根据关键词构造搜索 URL"""
+    def _build_search_url(
+        self,
+        keywords: str,
+        page: int = 1,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
+    ) -> str:
+        """根据关键词构造搜索 URL，支持翻页与筛选"""
         from urllib.parse import quote
-        url = f"{self.web_server_url}/search?q={quote(keywords)}"
+        url = f"{self.web_server_url}/search?q={quote(keywords)}&page={page}"
         if self.condition_name:
             url += f"&condition_name={quote(self.condition_name)}"
+        if price_min is not None and price_min > 0:
+            url += f"&price_min={price_min}"
+        if price_max is not None and price_max > 0:
+            url += f"&price_max={price_max}"
+        if rating_min is not None and rating_min > 0:
+            url += f"&rating_min={rating_min}"
         return url
 
     def extract_search_keywords(self) -> str:
@@ -142,19 +163,37 @@ class LiveBrowserAgent:
     # Verbal mode helpers
     # ==================================================================
 
-    def _api_search(self, keywords: str, limit: int = 8) -> List[dict]:
-        """调用 /api/search 获取结构化商品列表（与 visual 模式用同一检索管线）"""
+    def _api_search(
+        self,
+        keywords: str,
+        limit: int = 8,
+        page: int = 1,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
+    ) -> dict:
+        """调用 /api/search 获取结构化商品列表，支持翻页与筛选。返回 {products, page, total_pages}"""
         from urllib.parse import quote
-        url = f"{self.web_server_url}/api/search?q={quote(keywords)}&limit={limit}"
+        url = f"{self.web_server_url}/api/search?q={quote(keywords)}&page_size={limit}&page={page}"
         if self.condition_name:
             url += f"&condition_name={quote(self.condition_name)}"
+        if price_min is not None and price_min > 0:
+            url += f"&price_min={price_min}"
+        if price_max is not None and price_max > 0:
+            url += f"&price_max={price_max}"
+        if rating_min is not None and rating_min > 0:
+            url += f"&rating_min={rating_min}"
         try:
             resp = requests.get(url, timeout=15)
             data = resp.json()
-            return data.get("products", [])
+            return {
+                "products": data.get("products", []),
+                "page": data.get("page", 1),
+                "total_pages": data.get("total_pages", 1),
+            }
         except Exception as e:
             self.log("error", f"API 搜索请求失败: {e}")
-            return []
+            return {"products": [], "page": 1, "total_pages": 1}
 
     def _api_product_detail(self, product_id: str) -> Optional[dict]:
         """调用 /api/product/{id} 获取单个商品完整详情"""
@@ -204,45 +243,91 @@ class LiveBrowserAgent:
         return "\n".join(parts)
 
     def run_verbal(self, keywords: str):
-        """Verbal 模式：用结构化文本（非截图）让 LLM 选品并推荐"""
-        # Step 1: 获取 top-8 商品（同一检索管线）
-        self.log("action", f"[Verbal] 通过 API 检索商品: \"{keywords}\"")
-        products = self._api_search(keywords)
-        if not products:
-            self.log("error", "未检索到任何商品")
-            return
-        self.log("action", f"[Verbal] 获取到 {len(products)} 个商品")
+        """Verbal 模式：用结构化文本让 LLM 选品，支持自主翻页与筛选"""
+        max_refine = 10
+        for refine_step in range(max_refine):
+            self.log("action", f"[Verbal] 通过 API 检索商品: \"{keywords}\" (page={self.page}, price={self.price_min}-{self.price_max}, rating>={self.rating_min})")
+            data = self._api_search(
+                keywords,
+                page=self.page,
+                price_min=self.price_min,
+                price_max=self.price_max,
+                rating_min=self.rating_min,
+            )
+            products = data["products"]
+            total_pages = data["total_pages"]
+            if not products:
+                self.log("error", "未检索到任何商品")
+                if refine_step == 0:
+                    return
+                self.page = max(1, self.page - 1)
+                continue
+            self.log("action", f"[Verbal] 获取到 {len(products)} 个商品（第 {self.page}/{total_pages} 页）")
 
-        product_text = self._format_product_list(products)
-        self.log("thinking", f"候选商品列表:\n{product_text}")
+            product_text = self._format_product_list(products)
+            self.log("thinking", f"候选商品列表:\n{product_text}")
 
-        # Step 2: LLM 从文本选品
-        self.log("thinking", "[Verbal] LLM 正在分析商品列表...")
-        prompt_select = (
-            f"You are a shopping assistant helping a user find: \"{self.user_query}\"\n\n"
-            f"Here are the top {len(products)} search results:\n\n"
-            f"{product_text}\n\n"
-            "Based on the user's need, which ONE product would you like to examine in detail?\n"
-            "Reply with ONLY the number (1-{n}).".format(n=len(products))
-        )
-        try:
-            messages = [
-                Message(role="system", content="You are a shopping assistant. Reply with ONLY a number."),
-                Message(role="user", content=prompt_select),
-            ]
-            resp = self.agent.llm.generate(messages=messages, tools=None)
-            raw = resp.content if isinstance(resp.content, str) else str(resp.content)
-            for line in raw.strip().split("\n"):
-                if line.strip():
-                    self.log("thinking", line.strip())
+            has_next = self.page < total_pages
+            page_hint = (
+                f"Page {self.page}/{total_pages}. "
+                + ("Say 'next' to see more. " if has_next else "(No more pages.) ")
+            )
+            prompt_select = (
+                f"You are a shopping assistant helping a user find: \"{self.user_query}\"\n\n"
+                f"Here are the search results ({page_hint}):\n\n{product_text}\n\n"
+                "Reply with ONE of:\n"
+                "- A number (1-{n}) to select that product.\n"
+                "- 'next' to see the next page" + (" (only if there are more)." if has_next else " (no more pages).") + "\n"
+                "- 'filter price MIN MAX' to filter by price (e.g. 'filter price 10 50').\n"
+                "- 'filter rating N' to filter by minimum stars (e.g. 'filter rating 4')."
+            ).format(n=len(products))
 
-            chosen = 1
-            match = re.search(r"\b([1-9]\d*)\b", raw)
-            if match:
-                chosen = max(1, min(int(match.group(1)), len(products)))
-            self.log("action", f"✅ [Verbal] 选择第 {chosen} 个商品")
-        except Exception as e:
-            self.log("error", f"LLM 选品失败: {e}")
+            try:
+                messages = [
+                    Message(role="system", content="You are a shopping assistant. Reply with a number, 'next', or 'filter ...'."),
+                    Message(role="user", content=prompt_select),
+                ]
+                resp = self.agent.llm.generate(messages=messages, tools=None)
+                raw = (resp.content if isinstance(resp.content, str) else str(resp.content)).strip().lower()
+                for line in raw.split("\n"):
+                    if line.strip():
+                        self.log("thinking", line.strip())
+
+                if "next" in raw[:20]:
+                    if not has_next:
+                        self.log("thinking", "已到最后一页，请选择商品")
+                        continue
+                    self.page += 1
+                    self.log("action", f"✅ [Verbal] 翻到第 {self.page} 页")
+                    continue
+
+                fm = re.search(r"filter\s+price\s+([\d.]+)\s+([\d.]+)", raw)
+                if fm:
+                    self.price_min = float(fm.group(1))
+                    self.price_max = float(fm.group(2))
+                    self.page = 1
+                    self.log("action", f"✅ [Verbal] 筛选价格 ${self.price_min}-${self.price_max}")
+                    continue
+
+                fm = re.search(r"filter\s+rating\s+([\d.]+)", raw)
+                if fm:
+                    self.rating_min = float(fm.group(1))
+                    self.page = 1
+                    self.log("action", f"✅ [Verbal] 筛选星级 >={self.rating_min}")
+                    continue
+
+                chosen = 1
+                match = re.search(r"\b([1-9]\d*)\b", raw)
+                if match:
+                    chosen = max(1, min(int(match.group(1)), len(products)))
+                self.log("action", f"✅ [Verbal] 选择第 {chosen} 个商品")
+                break
+            except Exception as e:
+                self.log("error", f"LLM 选品失败: {e}")
+                chosen = 1
+                break
+        else:
+            self.log("action", "[Verbal] 达到最大翻页/筛选次数，使用第一个商品")
             chosen = 1
 
         # Step 3: 获取选中商品的完整详情
@@ -374,58 +459,85 @@ class LiveBrowserAgent:
             self.run_visual(keywords)
 
     def run_visual(self, keywords: str):
-        """Visual 模式：浏览器截图 → VLM 决策"""
-        search_url = self._build_search_url(keywords)
+        """Visual 模式：浏览器截图 → VLM 决策，支持自主翻页与筛选（循环直至选品）"""
         try:
             self.init_browser()
+            max_refine = 10
+            chosen = 0
+            product_links = []
 
-            self.log("thinking", "准备访问商品搜索结果页...")
-            screenshot = self.navigate_and_capture(search_url)
+            for refine_step in range(max_refine):
+                search_url = self._build_search_url(
+                    keywords,
+                    page=self.page,
+                    price_min=self.price_min,
+                    price_max=self.price_max,
+                    rating_min=self.rating_min,
+                )
+                self.log("thinking", "准备访问商品搜索结果页..." if refine_step == 0 else f"加载第 {self.page} 页...")
+                screenshot = self.navigate_and_capture(search_url)
+                product_links = self.get_product_detail_links_from_search()
+                num_products = len(product_links)
+                self.log("action", f"页面上共 {num_products} 个商品可点进详情")
 
-            product_links = self.get_product_detail_links_from_search()
-            num_products = len(product_links)
-            self.log("action", f"页面上共 {num_products} 个商品可点进详情")
+                observation = self.agent.perception.encode(screenshot)
+                prompt_search = (
+                    "请仔细查看这个商品搜索结果页的截图。回复以下之一：\n"
+                    "- 一个数字（1-{n}）：要查看第几个商品的详情\n"
+                    "- next：想看下一页\n"
+                    "- filter price MIN MAX：筛选价格，如 filter price 10 50\n"
+                    "- filter rating N：筛选最低星级，如 filter rating 4"
+                ).format(n=num_products or 1)
 
-            # VLM 分析搜索结果截图 → 选品
-            self.log("thinking", "VLM 正在分析搜索结果截图...")
-            observation = self.agent.perception.encode(screenshot)
-            screenshot_data_url = observation.data
+                try:
+                    messages_search = [
+                        Message(role="system", content="你是一个购物助手。回复数字选商品，或 next 翻页，或 filter ... 筛选。"),
+                        Message(role="user", content=observation.data),
+                        Message(role="user", content=prompt_search),
+                    ]
+                    response = self.agent.llm.generate(messages=messages_search, tools=None)
+                    analysis = response.content if isinstance(response.content, str) else str(response.content)
+                    for line in analysis.strip().split("\n"):
+                        if line.strip():
+                            self.log("thinking", line.strip())
+                            time.sleep(0.2)
 
-            prompt_search = (
-                "请仔细查看这个商品搜索结果页的截图，分析：\n"
-                "1. 有哪些商品？每个商品的价格和评分。\n"
-                "2. 你更想进一步查看哪一个商品的详情（例如看描述、规格）？\n"
-                "请只回复一个数字，表示你想查看第几个商品（1 表示第一个，2 表示第二个，以此类推）。"
-            )
-            if num_products > 0:
-                prompt_search += f"\n当前页面有 {num_products} 个商品，请回复 1 到 {num_products} 之间的一个数字。"
+                    did_navigate = False
+                    if "next" in analysis[:30]:
+                        self.page += 1
+                        self.log("action", f"✅ 翻到第 {self.page} 页")
+                        did_navigate = True
+                    elif re.search(r"filter\s+price\s+[\d.]+\s+[\d.]+", analysis):
+                        fm = re.search(r"filter\s+price\s+([\d.]+)\s+([\d.]+)", analysis)
+                        if fm:
+                            self.price_min = float(fm.group(1))
+                            self.price_max = float(fm.group(2))
+                            self.page = 1
+                            self.log("action", f"✅ 筛选价格 ${self.price_min}-${self.price_max}")
+                            did_navigate = True
+                    elif re.search(r"filter\s+rating\s+[\d.]+", analysis):
+                        fm = re.search(r"filter\s+rating\s+([\d.]+)", analysis)
+                        if fm:
+                            self.rating_min = float(fm.group(1))
+                            self.page = 1
+                            self.log("action", f"✅ 筛选星级 >={self.rating_min}")
+                            did_navigate = True
 
-            try:
-                messages_search = [
-                    Message(role="system", content="你是一个购物助手，擅长分析商品页面。只回复一个数字表示要查看第几个商品。"),
-                    Message(role="user", content=screenshot_data_url),
-                    Message(role="user", content=prompt_search),
-                ]
-                response = self.agent.llm.generate(messages=messages_search, tools=None)
-                analysis = response.content if isinstance(response.content, str) else str(response.content)
-                for line in analysis.strip().split("\n"):
-                    if line.strip():
-                        self.log("thinking", line.strip())
-                        time.sleep(0.2)
+                    if did_navigate:
+                        continue  # 循环重新截图并让 VLM 分析新页面
 
-                chosen = 1
-                match = re.search(r"\b([1-9]\d*)\b", analysis)
-                if match:
-                    chosen = max(1, min(int(match.group(1)), num_products or 1))
-                if num_products == 0:
-                    chosen = 0
-
-                self.log("action", f"✅ 搜索结果分析完成，选择查看第 {chosen} 个商品")
-            except Exception as e:
-                self.log("error", f"VLM 分析失败: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                chosen = 0
+                    match = re.search(r"\b([1-9]\d*)\b", analysis)
+                    if match:
+                        chosen = max(1, min(int(match.group(1)), num_products or 1))
+                    if num_products == 0:
+                        chosen = 0
+                    self.log("action", f"✅ 搜索结果分析完成，选择查看第 {chosen} 个商品" if chosen else "未选择商品")
+                    break
+                except Exception as e:
+                    self.log("error", f"VLM 分析失败: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    break
 
             # 点进详情页 → VLM 最终判断
             if chosen >= 1 and product_links and chosen <= len(product_links):
@@ -499,9 +611,13 @@ def main():
     parser.add_argument('--llm', choices=['openai', 'qwen'], default='qwen', help='LLM backend')
     parser.add_argument('--perception', choices=['visual', 'verbal'], default='visual',
                         help='感知模式: visual=截图给VLM, verbal=结构化文本给LLM')
-    parser.add_argument('--query', default='mousepad', help='用户购物需求（自然语言，Agent 会自动提取搜索关键词）')
+    parser.add_argument('--query', default='mousepad', help='用户购物需求（自然语言）')
     parser.add_argument('--server', default='http://localhost:5000', help='Web 服务器 URL')
-    parser.add_argument('--condition-name', default=None, help='实验条件名（需服务端 --condition-file 配合）')
+    parser.add_argument('--condition-name', default=None, help='实验条件名')
+    parser.add_argument('--page', type=int, default=1, help='初始页码')
+    parser.add_argument('--price-min', type=float, default=None, help='价格下限（USD）')
+    parser.add_argument('--price-max', type=float, default=None, help='价格上限（USD）')
+    parser.add_argument('--rating-min', type=float, default=None, help='最低星级')
     parser.add_argument('--once', action='store_true', help='完成一次分析后退出')
     
     args = parser.parse_args()
@@ -526,6 +642,10 @@ def main():
         user_query=args.query,
         condition_name=args.condition_name,
         stay_open=not args.once,
+        page=args.page,
+        price_min=args.price_min,
+        price_max=args.price_max,
+        rating_min=args.rating_min,
     )
     
     agent.run()

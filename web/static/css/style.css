@@ -81,6 +81,81 @@ body {
     color: #666;
 }
 
+/* Filter bar */
+.filter-bar {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    padding: 12px 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.filter-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-label {
+    font-size: 13px;
+    color: #555;
+    font-weight: 500;
+}
+
+.filter-input {
+    width: 80px;
+    padding: 6px 10px;
+    border: 1px solid #d5d9d9;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.filter-input::placeholder {
+    color: #888;
+}
+
+.filter-sep {
+    color: #888;
+    font-size: 14px;
+}
+
+.filter-select {
+    padding: 6px 10px;
+    border: 1px solid #d5d9d9;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    min-width: 100px;
+}
+
+.filter-btn {
+    padding: 6px 14px;
+    background: #febd69;
+    border: 1px solid #f3a847;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.filter-btn:hover {
+    background: #f3a847;
+}
+
+.filter-clear {
+    font-size: 13px;
+    color: #007185;
+    text-decoration: none;
+    margin-left: 8px;
+}
+
+.filter-clear:hover {
+    text-decoration: underline;
+    color: #c7511f;
+}
+
 /* Results container - 缩小到 90% */
 .results-container {
     display: grid;
@@ -284,6 +359,47 @@ body {
     font-size: 0.75em;
     font-weight: 400;
     margin-right: 6px;
+}
+
+/* Pagination */
+.pagination {
+    max-width: 1200px;
+    margin: 8px auto 26px;
+    padding: 0 20px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.page-btn,
+.page-number {
+    border: 1px solid #d5d9d9;
+    background: #fff;
+    color: #0F1111;
+    border-radius: 8px;
+    padding: 6px 12px;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.page-number.active {
+    background: #232F3E;
+    border-color: #232F3E;
+    color: #fff;
+}
+
+.page-btn.disabled {
+    color: #999;
+    background: #f4f4f4;
+    border-color: #e5e5e5;
+    cursor: not-allowed;
+}
+
+.page-ellipsis {
+    padding: 0 6px;
+    color: #666;
 }
 
 /* No results */

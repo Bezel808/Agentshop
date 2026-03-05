@@ -19,14 +19,9 @@ logger = logging.getLogger(__name__)
 
 class SearchTool(BaseTool):
     """
-    搜索商品工具。
+    搜索商品工具。支持翻页、价格与星级筛选。
     
-    如果 marketplace 支持截图，可以选择返回截图数据。
-    """
-    """
-    Tool for searching products in the marketplace.
-    
-    Example of a read-only tool (doesn't modify environment).
+    若 marketplace 支持截图，可选择返回截图数据。
     """
     
     def __init__(self, marketplace_api):
@@ -38,7 +33,7 @@ class SearchTool(BaseTool):
         """
         super().__init__(
             name="search_products",
-            description="Search for products matching a query",
+            description="Search for products matching a query. Supports pagination and filters (price, rating).",
             input_schema={
                 "type": "object",
                 "properties": {
@@ -54,11 +49,29 @@ class SearchTool(BaseTool):
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of results",
-                        "default": 10,
+                        "description": "Maximum number of results per page",
+                        "default": 8,
                         "minimum": 1,
                         "maximum": 50,
-                    }
+                    },
+                    "page": {
+                        "type": "integer",
+                        "description": "Page number (1-based). Use to browse more results.",
+                        "default": 1,
+                        "minimum": 1,
+                    },
+                    "price_min": {
+                        "type": "number",
+                        "description": "Minimum price filter (USD)",
+                    },
+                    "price_max": {
+                        "type": "number",
+                        "description": "Maximum price filter (USD)",
+                    },
+                    "rating_min": {
+                        "type": "number",
+                        "description": "Minimum star rating (e.g. 4 for 4+ stars)",
+                    },
                 },
                 "required": ["query"],
             }
@@ -69,23 +82,38 @@ class SearchTool(BaseTool):
         """Search marketplace for products."""
         query = parameters["query"]
         sort_by = parameters.get("sort_by", "relevance")
-        limit = parameters.get("limit", 10)
+        limit = parameters.get("limit", 8)
+        page = parameters.get("page", 1)
+        price_min = parameters.get("price_min")
+        price_max = parameters.get("price_max")
+        rating_min = parameters.get("rating_min")
         
-        # Call marketplace API (MarketplaceAdapter method)
+        # Call marketplace API (supports page + filters via kwargs)
         results = self.marketplace.search_products(
             query=query,
             sort_by=sort_by,
             limit=limit,
+            page=page,
+            price_min=price_min,
+            price_max=price_max,
+            rating_min=rating_min,
         )
         
         # Convert SearchResult to dict for tool return
         if hasattr(results, 'products'):
             products_data = products_to_summaries(results.products)
-            return {
+            out = {
                 "query": results.query,
                 "products": products_data,
-                "count": len(products_data)
+                "count": len(products_data),
             }
+            if hasattr(results, 'page') and results.page is not None:
+                out["page"] = results.page
+            if hasattr(results, 'total_pages') and results.total_pages is not None:
+                out["total_pages"] = results.total_pages
+            if hasattr(results, 'total_count') and results.total_count is not None:
+                out["total_count"] = results.total_count
+            return out
         
         logger.info(f"Search '{query}' returned {len(results.products) if hasattr(results, 'products') else 0} results")
         

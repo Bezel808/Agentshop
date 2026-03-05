@@ -52,6 +52,7 @@ class SearchResult:
     products: List[Product]
     total_count: int
     page: int = 1
+    total_pages: Optional[int] = None
     metadata: Optional[Dict[str, Any]] = None
 
 

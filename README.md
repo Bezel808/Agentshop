@@ -31,13 +31,13 @@ web/              templates/, static/
 | `./aces_ctl.sh status` | Health check | |
 | `./aces_ctl.sh run --query X` | Run experiment (delegates to run_experiment.py) | |
 | `run_experiment.py` | Main experiment runner | --mode simple\|llm, --query, --llm qwen\|openai\|deepseek, --perception visual\|verbal, --condition-file, --marketplace offline\|llamaindex |
-| `run_browser_agent.py` | VLM + Playwright: navigates web, screenshots, pushes to /viewer | --api-key, --llm qwen, --query |
+| `run_browser_agent.py` | VLM + Playwright: navigates web, screenshots, pushes to /viewer | --api-key, --llm qwen, --query, --page, --price-min, --price-max, --rating-min |
 | `run_ranking_experiment.py` | VLM ranks products | --api-key, --llm qwen |
 | `start_web_server.py` | Direct server start | --port, --host, --datasets-dir, --simple-search |
-| `expand_from_amazon.py` | Expand product DB from Amazon Reviews 2023 | --categories, --per-category, --scan-limit, --skip-image-check |
+| `manage_datasets.py` | 数据集管理（扩充/下载/补齐） | expand-from-amazon, expand-by-keyword, download-ace, enrich, list-sources |
 
 ## DATA FLOW (Agent Receives Product Info)
-1. **Marketplace.search_products(query)** → SearchResult.products (List[Product])
+1. **Marketplace.search_products(query, page?, price_min?, price_max?, rating_min?)** → SearchResult.products (List[Product]), total_pages
 2. **OfflineMarketplace** loads JSON from `datasets_unified/{query}.json`, applies ExperimentCondition if set
 3. **LlamaIndexMarketplace** (web server): BM25 + vector + reranker, semantic search over all products
 4. **product_to_summary(Product)** → dict with id, title, price, rating, rating_count, sponsored, best_seller, overall_pick, low_stock, position, original_price, custom_badges

@@ -43,7 +43,7 @@ playwright install chromium
 | `./aces_ctl.sh stop` | 停止已运行的 Web 服务 |
 | `./aces_ctl.sh status` | 查看是否在跑、健康检查 |
 | `ACES_PORT=5001 ./aces_ctl.sh start` | 指定端口 |
-| `ACES_DATASETS=datasets_extended/ace-bb ./aces_ctl.sh start` | 指定数据集目录 |
+| `ACES_DATASETS=datasets_unified ./aces_ctl.sh start` | 指定数据集目录 |
 | `./aces_ctl.sh log` | 实时查看日志 |
 | `ACES_SIMPLE_SEARCH=1 ./aces_ctl.sh start` | 不用 LlamaIndex（启动快） |
 

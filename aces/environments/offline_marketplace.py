@@ -84,59 +84,87 @@ class OfflineMarketplace(MarketplaceProvider):
             f"interventions={self.intervention_registry.get_active_interventions()}"
         )
     
+    def _apply_price_rating_filter(
+        self,
+        products: List[Product],
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
+    ) -> List[Product]:
+        """Filter products by price and rating."""
+        out = []
+        for p in products:
+            if price_min is not None and (p.price or 0) < price_min:
+                continue
+            if price_max is not None and (p.price or 0) > price_max:
+                continue
+            r = getattr(p, "rating", None) or 0
+            if rating_min is not None and r < rating_min:
+                continue
+            out.append(p)
+        return out
+
     def search_products(
         self,
         query: str,
         sort_by: str = "relevance",
         limit: int = 10,
+        page: int = 1,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        rating_min: Optional[float] = None,
         **kwargs
     ) -> SearchResult:
         """
         Search products in local datasets.
         
-        Loads products from JSON files named by query
-        (e.g., "mousepad.json", "laptop.json").
+        Supports pagination (page) and filters (price_min, price_max, rating_min).
         """
         self.current_query = query
-        
+        page = max(1, page)
+        page_size = limit
+
         # Load products from file
         products_data = self._load_products_for_query(query)
-        
-        # Convert to Product objects
         products = [
             self._dict_to_product(data, index)
             for index, data in enumerate(products_data)
         ]
-        
-        # Apply marketing interventions (legacy system)
-        products = [
-            self.intervention_registry.apply_all(p)
-            for p in products
-        ]
-        
-        # Apply experimental control variables (new system)
+
+        # Apply marketing interventions
+        products = [self.intervention_registry.apply_all(p) for p in products]
+
+        # Apply experimental control variables
         if self._active_condition is not None:
             products = self._active_condition.apply(products)
-        
+
+        # Apply price/rating filter
+        products = self._apply_price_rating_filter(
+            products, price_min=price_min, price_max=price_max, rating_min=rating_min
+        )
+
         # Sort
         products = self._sort_products(products, sort_by)
-        
-        # Limit
-        products = products[:limit]
-        
-        # Store current products
+
+        total_count = len(products)
+        total_pages = max(1, (total_count + page_size - 1) // page_size) if total_count else 1
+        page = min(page, total_pages)
+        start = (page - 1) * page_size
+        products = products[start : start + page_size]
+
         self.current_products = products
-        
+
         logger.info(
-            f"Search '{query}' returned {len(products)} products "
+            f"Search '{query}' page {page}/{total_pages} returned {len(products)} products "
             f"(sorted by {sort_by})"
         )
-        
+
         return SearchResult(
             query=query,
             products=products,
-            total_count=len(products_data),
-            page=1,
+            total_count=total_count,
+            page=page,
+            total_pages=total_pages,
             metadata={
                 "mode": "offline",
                 "interventions": self.intervention_registry.get_active_interventions(),

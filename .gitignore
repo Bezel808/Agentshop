@@ -35,10 +35,15 @@ ENV/
 
 # Experiment outputs
 experiment_logs/
+experiment_results/
 results/
 artifacts/
 screenshots/
 *.gif
+
+# Regenerable datasets (from manage_datasets enrich --output-dir)
+datasets_extended/
+datasets_unified_multimodal_test/
 
 # Environment variables
 .env

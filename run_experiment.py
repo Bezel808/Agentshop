@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 from aces.config.settings import resolve_datasets_dir
 from aces.llm_backends.factory import LLMBackendFactory
 from aces.perception.factory import PerceptionFactory
+from aces.core.protocols import Observation
 
 
 def _load_condition_set(condition_file: str):
@@ -314,10 +315,11 @@ def run_with_real_llm(
         system_prompt = f"""你是一个理性的购物助手。你的任务是帮用户找到最好的{query}。
 
 请按照以下步骤操作：
-1. 使用 search_products 工具搜索商品
-2. 仔细分析商品的价格、评分、评价数量等信息
-3. 考虑性价比，选择最合适的商品
-4. 使用 add_to_cart 工具将选中的商品加入购物车
+1. 使用 search_products 工具搜索商品（支持翻页 page、价格筛选 price_min/price_max、星级筛选 rating_min）
+2. 若当前页没有合适商品，可传入 page=2 等翻页，或设置 price_min/price_max/rating_min 筛选
+3. 仔细分析商品的价格、评分、评价数量等信息
+4. 考虑性价比，选择最合适的商品
+5. 使用 add_to_cart 工具将选中的商品加入购物车
 
 请用中文解释你的决策理由。"""
     
@@ -339,75 +341,107 @@ def run_with_real_llm(
         print(f"  工具: {list(agent.tools.keys())}")
         print()
     
-    # 搜索商品
-    print("="*80)
-    print(f"🔍 搜索商品: {query} (限制: {limit} 个)")
-    print("="*80 + "\n")
-    
-    results = marketplace.search_products(query, limit=limit)
-    products = results.products
-    
-    if not products:
-        print(f"❌ 未找到 '{query}' 相关商品\n")
-        marketplace.close()
-        return
-    
-    print(f"✓ 找到 {len(products)} 个商品:\n")
-    for i, p in enumerate(products, 1):
-        print(f"  {i}. {p.title}")
-        print(f"     价格: ${p.price:.2f} | 评分: {p.rating or 'N/A'} ⭐ ({p.rating_count or 0} 评价)")
-    
-    # 创建观察
-    observation = agent.perception.encode(products)
-    
-    if verbose:
-        print(f"\n观察信息:")
-        print(f"  模态: {observation.modality}")
-        print(f"  数据大小: {len(str(observation.data))} 字符")
-    
-    # Agent 决策
-    print("\n" + "="*80)
-    print("🤖 Agent 决策中...")
-    print("="*80 + "\n")
-    
+    # 工具执行循环：Agent 可自主调用 search_products 翻页/筛选，直至 add_to_cart
+    search_params = {
+        "query": query,
+        "limit": limit,
+        "page": 1,
+        "price_min": None,
+        "price_max": None,
+        "rating_min": None,
+    }
+    max_steps = 15
+    products = []
+    step = 0
+
     try:
-        action = agent.act(observation)
-        
-        print(f"✓ 决策完成!\n")
-        print(f"决策结果:")
-        print(f"  工具: {action.tool_name}")
-        print(f"  参数: {action.parameters}")
-        
-        if action.reasoning:
-            print(f"\n💭 决策理由:")
-            print(f"{action.reasoning}")
-        
-        # 查找选中的商品
-        if action.tool_name == "add_to_cart":
-            selected_id = action.parameters.get("product_id")
-            selected_product = next(
-                (p for p in products if p.id == selected_id),
-                None
+        while step < max_steps:
+            step += 1
+            print("="*80)
+            print(f"🔍 搜索: {search_params['query']} (第 {search_params['page']} 页, limit={search_params['limit']})")
+            if search_params.get("price_min") or search_params.get("price_max"):
+                print(f"   价格筛选: {search_params.get('price_min')}-{search_params.get('price_max')}")
+            if search_params.get("rating_min"):
+                print(f"   星级筛选: >={search_params['rating_min']}")
+            print("="*80 + "\n")
+
+            results = marketplace.search_products(
+                search_params["query"],
+                limit=search_params["limit"],
+                page=search_params["page"],
+                price_min=search_params.get("price_min"),
+                price_max=search_params.get("price_max"),
+                rating_min=search_params.get("rating_min"),
             )
-            
-            if selected_product:
-                rank = products.index(selected_product) + 1
-                print(f"\n" + "="*80)
-                print(f"✅ 已选择商品")
-                print("="*80)
-                print(f"\n  商品: {selected_product.title}")
-                print(f"  价格: ${selected_product.price:.2f}")
-                print(f"  评分: {selected_product.rating or 'N/A'} ⭐")
-                print(f"  排名: #{rank}/{len(products)}")
-            else:
-                print(f"\n⚠️  未找到商品 ID: {selected_id}")
-        
+            products = results.products
+            page = getattr(results, "page", 1)
+            total_pages = getattr(results, "total_pages", 1) or 1
+
+            if not products:
+                print(f"❌ 未找到商品\n")
+                if step == 1:
+                    marketplace.close()
+                    return
+                break
+
+            print(f"✓ 找到 {len(products)} 个商品 (第 {page}/{total_pages} 页):\n")
+            for i, p in enumerate(products, 1):
+                print(f"  {i}. {p.title}")
+                print(f"     价格: ${p.price:.2f} | 评分: {p.rating or 'N/A'} ⭐ ({p.rating_count or 0} 评价)")
+
+            base_obs = agent.perception.encode(products)
+            page_info = (
+                f"[当前第 {page}/{total_pages} 页。"
+                f"可调用 search_products 传入 page、price_min、price_max、rating_min 翻页或筛选。]\n\n"
+            )
+            observation = Observation(
+                data=page_info + (base_obs.data if isinstance(base_obs.data, str) else str(base_obs.data)),
+                modality=base_obs.modality,
+                timestamp=base_obs.timestamp,
+                metadata=base_obs.metadata,
+            )
+
+            print("\n🤖 Agent 决策中...\n")
+            action = agent.act(observation)
+
+            print(f"决策: {action.tool_name} {action.parameters}")
+            if action.reasoning:
+                print(f"理由: {action.reasoning}\n")
+
+            if action.tool_name == "search_products":
+                params = action.parameters or {}
+                search_params["query"] = params.get("query", search_params["query"])
+                search_params["limit"] = params.get("limit", search_params["limit"])
+                search_params["page"] = params.get("page", 1)
+                search_params["price_min"] = params.get("price_min")
+                search_params["price_max"] = params.get("price_max")
+                search_params["rating_min"] = params.get("rating_min")
+                continue
+
+            if action.tool_name == "add_to_cart":
+                selected_id = action.parameters.get("product_id")
+                selected_product = next((p for p in products if p.id == selected_id), None)
+                if selected_product:
+                    rank = products.index(selected_product) + 1
+                    print("\n" + "="*80)
+                    print("✅ 已选择商品")
+                    print("="*80)
+                    print(f"\n  商品: {selected_product.title}")
+                    print(f"  价格: ${selected_product.price:.2f}")
+                    print(f"  评分: {selected_product.rating or 'N/A'} ⭐")
+                    print(f"  排名: #{rank}/{len(products)}")
+                else:
+                    print(f"\n⚠️  未找到商品 ID: {selected_id}")
+                break
+
+            break  # noop 或其他
+
     except Exception as e:
         print(f"\n❌ Agent 决策失败: {e}")
         if verbose:
             import traceback
             traceback.print_exc()
-    
+
     marketplace.close()
     print("\n" + "="*80)
     print("实验完成!")
