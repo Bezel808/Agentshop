@@ -27,10 +27,7 @@ ACES-v2/
 │
 ├── aces_ctl.sh              # 控制脚本
 ├── start_web_server.py      # Web 服务
-├── run_experiment.py        # 实验入口
-├── run_browser_agent.py     # VLM 购物 Agent
-├── run_browser_agent_multi.py  # 多详情页浏览 Agent
-├── run_ranking_experiment.py   # 排序实验
+├── run_browser_agent.py     # Agent 唯一入口（VLM 理解需求 + verbal/visual + 推荐一商品）
 ├── manage_datasets.py       # 数据集管理（统一入口）
 ├── test_*.py                # 测试
 │
@@ -48,10 +45,7 @@ ACES-v2/
 |------|------|
 | `./aces_ctl.sh start` | 启动 Web 服务 |
 | `start_web_server.py` | 直接启动 Web |
-| `run_experiment.py` | 运行实验 |
-| `run_browser_agent.py` | VLM 购物 Agent |
-| `run_browser_agent_multi.py` | 多商品详情页浏览 Agent |
-| `run_ranking_experiment.py` | 排序实验 |
+| `run_browser_agent.py` | Agent 唯一入口：VLM 理解需求 + verbal/visual + 推荐一商品 |
 | `manage_datasets.py` | 数据集扩充/下载/补齐 |
 
 ## 数据集

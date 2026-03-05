@@ -1,18 +1,15 @@
 # 实验条件配置速查 (Condition Reference)
 
 通过 YAML 条件文件控制商品价格、描述、标签等，用于行为经济学实验。  
-**仅支持 offline 模式**（`run_experiment.py --marketplace offline`）。
+Web 模式下通过 `--condition-name` 传递条件名给搜索接口。
 
 ---
 
 ## 快速示例
 
 ```bash
-# 使用条件文件运行
-python run_experiment.py --query mousepad -C configs/experiments/your_condition.yaml
-
-# 指定使用哪个条件（默认用第一个）
-python run_experiment.py --query mousepad -C your.yaml --condition-name treatment
+# 指定实验条件名（Web 搜索会按条件返回商品）
+python run_browser_agent.py --query mousepad --condition-name treatment
 ```
 
 ---

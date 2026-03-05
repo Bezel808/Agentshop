@@ -109,6 +109,7 @@
                 {% endif %}
             </div>
             <div class="product-info">
+                <span class="product-id" style="font-size:11px;color:#666;font-family:monospace;">ID: {{ product.id }}</span>
                 <h2 class="product-title">{{ product.title }}</h2>
                 <div class="product-rating">
                     {% set rating = product.rating|float %}

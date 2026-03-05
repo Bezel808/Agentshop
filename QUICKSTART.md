@@ -39,7 +39,7 @@ python start_web_server.py \
 
 ---
 
-## 🤖 运行 Browser Agent（VLM 实时分析）
+## 🤖 运行 Agent（唯一入口）
 
 ```bash
 export QWEN_API_KEY="your-qwen-key"
@@ -47,20 +47,12 @@ export QWEN_API_KEY="your-qwen-key"
 python -u run_browser_agent.py \
   --api-key "$QWEN_API_KEY" \
   --llm qwen \
+  --perception visual \
   --query mousepad
 ```
 
----
-
-## 🧪 运行实验
-
-```bash
-# 简单模式（不调用 LLM）
-python run_experiment.py --mode simple --query mousepad --trials 5
-
-# VLM 实验（默认 qwen + visual）
-python run_experiment.py --query mousepad
-```
+- `--perception verbal`：文本模式（不启动浏览器）
+- `--once`：分析一次后退出
 
 ---
 

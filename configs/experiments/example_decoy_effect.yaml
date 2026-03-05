@@ -8,7 +8,7 @@
 #   - treatment:   A vs B vs D (贵低分, 被 B 支配 —— 诱饵)
 #
 # 用法:
-#   python run_experiment.py --condition-file configs/experiments/example_decoy_effect.yaml
+#   python run_browser_agent.py --condition-name <条件名>
 # =============================================================================
 
 name: decoy_effect_study

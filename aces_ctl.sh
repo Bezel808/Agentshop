@@ -13,7 +13,7 @@
 #    status    查看服务 + 进程状态
 #    log       实时查看服务日志
 #    forward   打印 SSH 端口转发命令（方便复制）
-#    run       运行实验 (透传参数给 run_experiment.py)
+#    run       运行 Agent (透传参数给 run_browser_agent.py)
 #    conditions 列出可用的实验条件文件
 #    datasets  列出可用的数据集 / 商品类目
 #    health    健康检查（返回JSON）
@@ -198,10 +198,10 @@ cmd_run() {
     # 确保服务已启动（如果实验用的是 web_renderer 或 llamaindex 在线模式）
     # 对于 offline 模式无需 web 服务
 
-    # 透传所有参数给 run_experiment.py
-    _info "执行: python3 run_experiment.py $*"
+    # 透传所有参数给 run_browser_agent.py
+    _info "执行: python3 run_browser_agent.py $*"
     echo ""
-    python3 run_experiment.py "$@"
+    python3 run_browser_agent.py "$@"
 }
 
 cmd_conditions() {
@@ -276,7 +276,7 @@ cmd_help() {
     echo "  forward                   打印 SSH 端口转发命令"
     echo ""
     echo "实验:"
-    echo "  run [...]                 运行实验（参数透传给 run_experiment.py）"
+    echo "  run [...]                 运行 Agent（参数透传给 run_browser_agent.py）"
     echo "  conditions                列出可用的实验条件文件"
     echo "  datasets                  列出可用的商品数据集"
     echo ""
@@ -291,9 +291,8 @@ cmd_help() {
     echo "示例:"
     echo "  ./aces_ctl.sh start                          # 启动服务"
     echo "  ./aces_ctl.sh status                         # 查看状态"
-    echo "  ./aces_ctl.sh run --mode simple --trials 10  # 运行简单实验"
-    echo "  ./aces_ctl.sh run --llm qwen --query mousepad \\"
-    echo "    -C configs/experiments/example_price_anchoring.yaml"
+    echo "  ./aces_ctl.sh run --query mousepad            # 运行 Agent"
+    echo "  ./aces_ctl.sh run --llm qwen --perception visual --query ski"
     echo ""
 }
 

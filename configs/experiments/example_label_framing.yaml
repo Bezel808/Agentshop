@@ -11,7 +11,7 @@
 #   - overall_pick:  目标商品标注 Overall Pick
 #
 # 用法:
-#   python run_experiment.py --condition-file configs/experiments/example_label_framing.yaml
+#   python run_browser_agent.py --condition-name <条件名>
 # =============================================================================
 
 name: label_framing_study

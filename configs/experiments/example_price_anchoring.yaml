@@ -8,7 +8,7 @@
 #   - treatment:  显示"原价"并标注折扣
 #
 # 用法:
-#   python run_experiment.py --condition-file configs/experiments/example_price_anchoring.yaml
+#   python run_browser_agent.py --condition-name <条件名>
 # =============================================================================
 
 name: price_anchoring_study
