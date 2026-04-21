@@ -134,7 +134,53 @@ python run_browser_agent.py \
 
 ---
 
-## 5. 数据集管理
+## 5. 我们之前实验怎么启动（可复现）
+
+下面是我们之前做分布实验时的核心配置（保持一致可复现近似结果）：
+
+- `llm=qwen`
+- `max_steps=45`
+- verbal 打开 `--verbal-use-vlm`
+- server 固定 `http://127.0.0.1:5000`
+- 每个 `(query, mode)` 运行 100 次
+
+### 5.1 四个 query（历史全量）
+
+```text
+1) bluetooth speaker price 35 and 40
+2) usb_flash_drive price between 7.20 and 12.20
+3) vase price between 14.99 and 20
+4) smart watch price between 55 and 59.99
+```
+
+### 5.2 启动方式（统一走网页后端）
+
+先启动服务：
+
+```bash
+python start_web_server.py --port 5000 --datasets-dir datasets/current
+```
+
+再运行下面脚本（通过 `/api/run-agent` 和 `/api/agent-status`，与网页端同一后端路径）：
+
+```bash
+python scripts/run_distribution_via_web_backend.py \
+  --server http://127.0.0.1:5000 \
+  --runs-per-combo 100 \
+  --run-timeout-sec 420 \
+  --output-dir experiment_results/web_full_4queries_100x2
+```
+
+输出文件：
+- `records.jsonl`
+- `summary.json`
+- `summary.csv`
+
+说明：这个方式会让“网页端手动跑”和“批量脚本跑”使用同一后端触发路径，结果分布更容易保持一致。
+
+---
+
+## 6. 数据集管理
 
 ### 6.1 查看与扩充
 
@@ -152,7 +198,7 @@ python manage_datasets.py filter-reviews --input-dir datasets_new --output-dir d
 
 ---
 
-## 6. 常见运行建议
+## 7. 常见运行建议
 
 - 长实验建议使用 `tmux` 或 `nohup` 后台执行。
 - 当前仓库以“可运行主链路”为主，默认不包含历史实验分析脚本与分析产物。
@@ -168,7 +214,7 @@ python manage_datasets.py filter-reviews --input-dir datasets_new --output-dir d
 
 ---
 
-## 7. 快速排障
+## 8. 快速排障
 
 ```bash
 # 服务状态
@@ -183,7 +229,7 @@ curl -s http://127.0.0.1:5000/health
 
 ---
 
-## 8. 版本与协作
+## 9. 版本与协作
 
 建议每次实验前固定并记录：
 - 当前 git commit hash
