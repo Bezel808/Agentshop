@@ -792,12 +792,15 @@ def start_server(
         q: str = "",
         page: int = 1,
         page_size: int = 30,
+        price_min: str | float | None = None,
+        price_max: str | float | None = None,
     ):
         _require_viewer_token_http(request)
         products = _load_category_products(category)
         page = max(1, int(page))
         page_size = max(1, min(int(page_size), 200))
         keyword = (q or "").strip().lower()
+        pmin, pmax, _ = _normalize_filter_bounds(price_min, price_max, None)
 
         indexed = list(enumerate(products))
         if keyword:
@@ -806,6 +809,20 @@ def start_server(
                 text = f"{p.get('title', '')} {p.get('description', '')} {p.get('sku', '')}".lower()
                 return keyword in text
             indexed = [x for x in indexed if _match(x)]
+
+        if pmin is not None or pmax is not None:
+            def _in_price(item: tuple[int, dict]) -> bool:
+                _, p = item
+                try:
+                    price = float(p.get("price"))
+                except Exception:
+                    return False
+                if pmin is not None and price < pmin:
+                    return False
+                if pmax is not None and price > pmax:
+                    return False
+                return True
+            indexed = [x for x in indexed if _in_price(x)]
 
         total = len(indexed)
         start = (page - 1) * page_size
@@ -837,11 +854,79 @@ def start_server(
         return {
             "category": category,
             "query": q,
+            "price_min": pmin,
+            "price_max": pmax,
             "page": page,
             "page_size": page_size,
             "total": total,
             "total_pages": total_pages,
             "products": rows,
+        }
+
+    @app.post("/api/admin/indices-by-price")
+    async def admin_indices_by_price(request: Request):
+        """
+        根据价格区间给出需要删除的索引集合（不直接删除）：
+        - keep_in_range=True:  删除区间外（保留区间内）
+        - keep_in_range=False: 删除区间内（反选）
+        """
+        _require_viewer_token_http(request)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        category = (body.get("category") or "").strip()
+        q = (body.get("q") or "").strip().lower()
+        keep_in_range = bool(body.get("keep_in_range", True))
+        pmin, pmax, _ = _normalize_filter_bounds(body.get("price_min"), body.get("price_max"), None)
+
+        if not category:
+            raise HTTPException(status_code=400, detail="category 不能为空")
+        if pmin is None and pmax is None:
+            raise HTTPException(status_code=400, detail="请至少提供 price_min 或 price_max")
+
+        products = _load_category_products(category)
+        indexed = list(enumerate(products))
+        if q:
+            def _match(item: tuple[int, dict]) -> bool:
+                _, p = item
+                text = f"{p.get('title', '')} {p.get('description', '')} {p.get('sku', '')}".lower()
+                return q in text
+            indexed = [x for x in indexed if _match(x)]
+
+        def _is_in_range(p: dict) -> bool:
+            try:
+                price = float(p.get("price"))
+            except Exception:
+                return False
+            if pmin is not None and price < pmin:
+                return False
+            if pmax is not None and price > pmax:
+                return False
+            return True
+
+        matched = []
+        to_delete = []
+        for idx, p in indexed:
+            in_range = _is_in_range(p)
+            if in_range:
+                matched.append(idx)
+            should_delete = (not in_range) if keep_in_range else in_range
+            if should_delete:
+                to_delete.append(idx)
+
+        return {
+            "ok": True,
+            "category": category,
+            "query": q,
+            "price_min": pmin,
+            "price_max": pmax,
+            "keep_in_range": keep_in_range,
+            "scope_total": len(indexed),
+            "in_range_count": len(matched),
+            "delete_count": len(to_delete),
+            "indices": to_delete,
         }
 
     @app.post("/api/admin/delete")

@@ -131,9 +131,17 @@
                 <label>关键词：
                     <input id="keyword" type="text" placeholder="例如：band / strap / women / refurbished">
                 </label>
+                <label>价格下限：
+                    <input id="priceMin" type="text" inputmode="decimal" placeholder="如 20">
+                </label>
+                <label>价格上限：
+                    <input id="priceMax" type="text" inputmode="decimal" placeholder="如 60">
+                </label>
                 <button id="searchBtn" class="btn-primary">查询</button>
                 <button id="selectAllBtn" class="btn-secondary">全选当前页</button>
                 <button id="clearBtn" class="btn-secondary">清空选择</button>
+                <button id="keepRangeBtn" class="btn-secondary">保留区间（删区间外）</button>
+                <button id="invertRangeBtn" class="btn-secondary">反选区间（删区间内）</button>
                 <button id="deleteBtn" class="btn-danger">删除选中</button>
             </div>
             <div id="status" class="status"></div>
@@ -206,8 +214,18 @@
         async function loadProducts(page = 1) {
             currentCategory = document.getElementById('category').value;
             const q = (document.getElementById('keyword').value || '').trim();
+            const priceMin = (document.getElementById('priceMin').value || '').trim();
+            const priceMax = (document.getElementById('priceMax').value || '').trim();
             if (!currentCategory) return;
-            const url = withToken(`/api/admin/products?category=${encodeURIComponent(currentCategory)}&q=${encodeURIComponent(q)}&page=${page}&page_size=30`);
+            const params = new URLSearchParams({
+                category: currentCategory,
+                q,
+                page: String(page),
+                page_size: '30',
+            });
+            if (priceMin) params.set('price_min', priceMin);
+            if (priceMax) params.set('price_max', priceMax);
+            const url = withToken(`/api/admin/products?${params.toString()}`);
             const res = await fetch(url, { headers: authHeaders() });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || '加载商品失败');
@@ -219,6 +237,35 @@
             document.getElementById('pagerText').textContent = `第 ${currentPage}/${totalPages} 页`;
             document.getElementById('prevBtn').disabled = currentPage <= 1;
             document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        async function pickIndicesByPrice(keepInRange) {
+            currentCategory = document.getElementById('category').value;
+            const q = (document.getElementById('keyword').value || '').trim();
+            const priceMin = (document.getElementById('priceMin').value || '').trim();
+            const priceMax = (document.getElementById('priceMax').value || '').trim();
+            if (!currentCategory) throw new Error('请先选择类目');
+            if (!priceMin && !priceMax) throw new Error('请至少填写价格下限或上限');
+
+            const res = await fetch(withToken('/api/admin/indices-by-price'), {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    category: currentCategory,
+                    q,
+                    price_min: priceMin || null,
+                    price_max: priceMax || null,
+                    keep_in_range: keepInRange,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '按价格筛选失败');
+
+            selectedIndices.clear();
+            for (const idx of data.indices || []) selectedIndices.add(Number(idx));
+            await loadProducts(1);
+            const modeText = keepInRange ? '保留区间内（删除区间外）' : '反选区间（删除区间内）';
+            setStatus(`已按价格规则选中 ${data.delete_count} 条待删除（范围内 ${data.in_range_count}/${data.scope_total}，模式：${modeText}）`);
         }
 
         function renderRows() {
@@ -312,6 +359,12 @@
                 setStatus(e.message || '删除失败', false);
             }
         });
+        document.getElementById('keepRangeBtn').addEventListener('click', async () => {
+            try { await pickIndicesByPrice(true); } catch (e) { setStatus(e.message || '按价格选择失败', false); }
+        });
+        document.getElementById('invertRangeBtn').addEventListener('click', async () => {
+            try { await pickIndicesByPrice(false); } catch (e) { setStatus(e.message || '按价格选择失败', false); }
+        });
 
         document.getElementById('prevBtn').addEventListener('click', async () => {
             if (currentPage <= 1) return;
@@ -352,6 +405,12 @@
         });
 
         document.getElementById('keyword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('searchBtn').click();
+        });
+        document.getElementById('priceMin').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('searchBtn').click();
+        });
+        document.getElementById('priceMax').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') document.getElementById('searchBtn').click();
         });
 
