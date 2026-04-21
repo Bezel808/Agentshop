@@ -30,7 +30,7 @@ cd "$SCRIPT_DIR"
 # ---- 默认配置 ----
 PORT="${ACES_PORT:-5000}"
 HOST="${ACES_HOST:-0.0.0.0}"
-DATASETS_DIR="${ACES_DATASETS:-datasets_unified}"
+DATASETS_DIR="${ACES_DATASETS:-datasets/current}"
 MAX_PAGES="${ACES_MAX_PAGES:-5}"    # 最多 N 页，每页 8 个 = 最多 40 个商品
 LOG_FILE="${ACES_LOG:-/tmp/aces_web_server.log}"
 PROCESS_MARK="start_web_server.py"
@@ -496,7 +496,7 @@ cmd_help() {
     echo "环境变量:"
     echo "  ACES_PORT          端口 (默认: 5000)"
     echo "  ACES_HOST          监听地址 (默认: 0.0.0.0)"
-    echo "  ACES_DATASETS      数据集目录 (默认: datasets_unified)"
+    echo "  ACES_DATASETS      数据集目录 (默认: datasets/current)"
     echo "  ACES_MAX_PAGES     最多页数 (默认: 5，每页 8 个 = 最多 40 商品)"
     echo "  ACES_LOG           日志文件 (默认: /tmp/aces_web_server.log)"
     echo "  ACES_SIMPLE_SEARCH 设为1则禁用 LlamaIndex RAG"

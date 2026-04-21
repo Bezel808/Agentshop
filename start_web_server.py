@@ -1204,7 +1204,7 @@ def main():
     parser.add_argument(
         "--datasets-dir", "-d",
         type=str,
-        default="../ACES/datasets",
+        default="datasets/current",
         help="数据集目录路径"
     )
     parser.add_argument(
