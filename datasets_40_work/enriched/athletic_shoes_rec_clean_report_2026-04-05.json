@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-04-05T10:53:50",
+  "pool_count": 1287,
+  "dedup_count": 336,
+  "valid_count": 203,
+  "final_count": 200,
+  "selected_window": [
+    29.99,
+    99.99,
+    175,
+    "fallback"
+  ],
+  "removed": {
+    "exclude_non_athletic": 119,
+    "no_athletic_signal": 14
+  },
+  "audit_suspect_count": 0,
+  "audit_samples": []
+}

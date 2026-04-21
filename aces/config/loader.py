@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 import yaml
 import logging
 
-from aces.core.protocols import ExperimentConfig
+from aces.experiments.protocols import ExperimentConfig
 from aces.agents.base_agent import ComposableAgent
 from aces.llm_backends.factory import LLMBackendFactory
 from aces.perception.factory import PerceptionFactory
@@ -43,11 +43,19 @@ class ConfigLoader:
         
         # Parse and validate
         exp_config = ExperimentConfig(
+            experiment_id=config_dict.get("experiment_id", config_dict.get("name", "adhoc_experiment")),
+            name=config_dict.get("name", "ACES Experiment"),
+            description=config_dict.get("description", ""),
             agent_config=config_dict.get("agent", {}),
             environment_config=config_dict.get("environment", {}),
-            perception_mode=config_dict.get("perception_mode", "visual"),
-            max_steps=config_dict.get("max_steps", 10),
+            num_trials=config_dict.get("num_trials", 1),
+            max_steps_per_trial=config_dict.get("max_steps_per_trial", config_dict.get("max_steps", 10)),
             random_seed=config_dict.get("random_seed"),
+            interventions=config_dict.get("interventions", []),
+            metrics=config_dict.get("metrics", []),
+            output_dir=config_dict.get("output_dir", "experiment_results"),
+            save_screenshots=config_dict.get("save_screenshots", True),
+            save_trajectories=config_dict.get("save_trajectories", True),
             metadata=config_dict.get("metadata", {}),
         )
         

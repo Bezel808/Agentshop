@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Iterable, List
 
 from aces.tools.shopping_tools import SearchTool, AddToCartTool, ViewProductDetailsTool
+from aces.tools.shopping_browser_tools import create_shopping_browser_tools
 
 
 _TOOL_MAP = {
@@ -27,3 +28,8 @@ class ToolFactory:
     @staticmethod
     def create_many(tool_names: Iterable[str], marketplace_api) -> List:
         return [ToolFactory.create(name, marketplace_api) for name in tool_names]
+
+    @staticmethod
+    def create_shopping_browser_tools(env) -> List:
+        """Create tools for Tool-First browser/API shopping agent."""
+        return create_shopping_browser_tools(env)

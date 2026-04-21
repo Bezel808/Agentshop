@@ -4,11 +4,14 @@
 用于在服务器上启动商品展示页面，支持本地和远程访问。
 """
 
+import os
+import json
 import re
 import sys
 import logging
 import math
 from pathlib import Path
+from urllib.parse import quote
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent))
@@ -21,7 +24,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-DEFAULT_WEB_MAX_PAGES = 64  # 支持多页分页，每页8个商品
+DEFAULT_WEB_MAX_PAGES = 5   # 每次最多展示 N 页（默认 5 页，每页 8 个 = 最多 40 个商品）
 
 
 def _normalize_image_urls(raw_data: dict | None, primary_image: str = "") -> list[str]:
@@ -123,6 +126,25 @@ def _dedupe_image_urls(urls: list[str]) -> list[str]:
     return [v[1] for v in by_id.values()]
 
 
+def _to_search_image_url(url: str) -> str:
+    """列表页使用更轻量的缩略图，减少首屏等待时间。"""
+    if not isinstance(url, str):
+        return ""
+    source = url.strip()
+    if not source or not source.startswith("http"):
+        return ""
+
+    # Amazon 图片通常可通过规格后缀切到更小尺寸（例如 _AC_SX300_）。
+    if "m.media-amazon.com/images/" in source:
+        return re.sub(
+            r"\._[^.]*\.(jpg|jpeg|png|webp)$",
+            r"._AC_SX300_.\1",
+            source,
+            flags=re.IGNORECASE,
+        )
+    return source
+
+
 def _normalize_reviews(raw_data: dict | None) -> list[dict]:
     """提取并标准化评论结构，统一为 title/text/rating/author/date。"""
     if not raw_data:
@@ -183,6 +205,31 @@ def _normalize_reviews(raw_data: dict | None) -> list[dict]:
     return normalized
 
 
+def _count_product_images(product: dict | None) -> int:
+    """统计商品可用图片数量（优先 image_urls/description_images，回退到 image_url）。"""
+    if not isinstance(product, dict):
+        return 0
+    urls: list[str] = []
+    for key in ("image_urls", "description_images"):
+        value = product.get(key)
+        if isinstance(value, list):
+            for u in value:
+                if isinstance(u, str) and u.startswith("http") and u not in urls:
+                    urls.append(u)
+    if urls:
+        return len(urls)
+    image_url = product.get("image_url")
+    return 1 if isinstance(image_url, str) and image_url.startswith("http") else 0
+
+
+def _count_product_reviews(product: dict | None) -> int:
+    """统计商品评论数。"""
+    if not isinstance(product, dict):
+        return 0
+    reviews = product.get("reviews")
+    return len(reviews) if isinstance(reviews, list) else 0
+
+
 def _apply_price_rating_filter(
     products: list,
     price_min: float | None = None,
@@ -202,6 +249,31 @@ def _apply_price_rating_filter(
             continue
         filtered.append(p)
     return filtered
+
+
+def _normalize_non_negative_float(v) -> float | None:
+    """解析为非负浮点数，空值/非法值返回 None。"""
+    if v is None or (isinstance(v, str) and not str(v).strip()):
+        return None
+    try:
+        f = float(v)
+        return f if f >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_filter_bounds(
+    price_min,
+    price_max,
+    rating_min,
+) -> tuple[float | None, float | None, float | None]:
+    """标准化筛选边界，并在上下限反转时自动纠正。"""
+    pmin = _normalize_non_negative_float(price_min)
+    pmax = _normalize_non_negative_float(price_max)
+    rmin = _normalize_non_negative_float(rating_min)
+    if pmin is not None and pmax is not None and pmin > pmax:
+        pmin, pmax = pmax, pmin
+    return pmin, pmax, rmin
 
 
 def _compute_display_pages(current: int, total: int, window: int = 2) -> list:
@@ -234,7 +306,7 @@ def _expand_products_for_pagination(
     all_products: list,
     target_count: int,
 ) -> list:
-    """当搜索结果不足时，从全库补齐，保证分页可用。"""
+    """当搜索结果不足时，只补充与查询词相关的候选，避免引入无关商品。"""
     if len(products) >= target_count:
         return products
 
@@ -245,12 +317,18 @@ def _expand_products_for_pagination(
     for p in all_products:
         if p.id in existing_ids:
             continue
-        text = f"{(p.title or '').lower()} {(p.description or '').lower()}"
-        score = 0
+        title_text = (p.title or "").lower()
+        desc_text = (p.description or "").lower()
+        title_score = 0
+        desc_score = 0
         for term in query_terms:
-            if term in text:
-                score += 1
-        if score > 0:
+            if term in title_text:
+                title_score += 1
+            if term in desc_text:
+                desc_score += 1
+        # 仅在标题命中时作为补齐候选，避免引入语义弱相关商品。
+        if title_score > 0:
+            score = title_score * 10 + desc_score
             scored_candidates.append((score, p))
 
     # 先补最相关，再补剩余任意商品
@@ -261,14 +339,21 @@ def _expand_products_for_pagination(
         if len(products) >= target_count:
             return products
 
-    for p in all_products:
-        if p.id in existing_ids:
-            continue
-        products.append(p)
-        if len(products) >= target_count:
-            return products
-
     return products
+
+
+def _is_product_dataset_file(json_file: Path) -> bool:
+    """仅接受 list[dict] 结构的数据文件，自动跳过质量报告等元数据文件。"""
+    try:
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return False
+    return isinstance(data, list) and all(isinstance(item, dict) for item in data)
+
+
+def _list_product_dataset_files(data_path: Path) -> list[Path]:
+    return [fp for fp in sorted(data_path.glob("*.json")) if _is_product_dataset_file(fp)]
 
 
 def start_server(
@@ -277,6 +362,9 @@ def start_server(
     host: str = "0.0.0.0",  # 0.0.0.0 允许远程访问
     use_llamaindex: bool = True,  # 使用 LlamaIndex RAG 检索
     condition_file: str | None = None,  # 实验条件 YAML 文件路径
+    max_pages: int = DEFAULT_WEB_MAX_PAGES,  # 每次最多展示 N 页
+    index_cache_dir: str = ".cache/llamaindex",
+    rebuild_index: bool = False,
 ):
     """
     启动 Web 服务器
@@ -297,6 +385,10 @@ def start_server(
         return
     
     logger.info(f"数据集目录: {data_path}")
+    product_dataset_files = _list_product_dataset_files(data_path)
+    skipped_count = len(list(data_path.glob("*.json"))) - len(product_dataset_files)
+    if skipped_count > 0:
+        logger.warning(f"已跳过 {skipped_count} 个非商品数据文件（如报告/元数据 JSON）")
     
     # 创建 marketplace
     if use_llamaindex:
@@ -305,7 +397,9 @@ def start_server(
         marketplace = LlamaIndexMarketplace()
         marketplace.initialize({
             "datasets_dir": str(data_path),
-            "use_reranker": True
+            "use_reranker": True,
+            "index_cache_dir": index_cache_dir,
+            "rebuild_index": rebuild_index,
         })
     else:
         logger.info("使用简单文件名匹配")
@@ -353,6 +447,7 @@ def start_server(
             "rating": p.rating or 0,
             "rating_count": p.rating_count or 0,
             "image_url": primary or "",
+            "search_image_url": _to_search_image_url(primary or ""),
             "image_urls": image_urls,
             "gallery_images": gallery_images,
             "description_images": description_images,
@@ -369,7 +464,7 @@ def start_server(
 
     # 手动启动服务器（支持远程访问）
     try:
-        from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+        from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
         from fastapi.responses import HTMLResponse
         from fastapi.staticfiles import StaticFiles
         from fastapi.templating import Jinja2Templates
@@ -381,6 +476,36 @@ def start_server(
     
     # 创建 FastAPI app
     app = FastAPI(title="ACES-v2 Product Search")
+    viewer_token = (os.getenv("ACES_VIEWER_TOKEN") or "").strip()
+
+    if viewer_token:
+        logger.info("Viewer token 鉴权已启用")
+    else:
+        logger.warning("ACES_VIEWER_TOKEN 未设置，Viewer 相关接口将拒绝访问")
+
+    def _extract_http_token(request: Request) -> str:
+        header_token = (request.headers.get("X-ACES-Token") or "").strip()
+        if header_token:
+            return header_token
+        return (request.query_params.get("token") or "").strip()
+
+    def _extract_ws_token(websocket: WebSocket) -> str:
+        header_token = (websocket.headers.get("x-aces-token") or "").strip()
+        if header_token:
+            return header_token
+        return (websocket.query_params.get("token") or "").strip()
+
+    def _require_viewer_token_http(request: Request):
+        if not viewer_token:
+            raise HTTPException(status_code=401, detail="ACES_VIEWER_TOKEN 未配置")
+        if _extract_http_token(request) != viewer_token:
+            raise HTTPException(status_code=401, detail="unauthorized")
+
+    async def _require_viewer_token_ws(websocket: WebSocket) -> bool:
+        if not viewer_token or _extract_ws_token(websocket) != viewer_token:
+            await websocket.close(code=1008)
+            return False
+        return True
     
     # WebSocket 连接管理
     active_connections = []
@@ -427,18 +552,7 @@ def start_server(
         filter_params = {}
         pagination = None
 
-        def _parse_float(v) -> float | None:
-            if v is None or (isinstance(v, str) and not str(v).strip()):
-                return None
-            try:
-                f = float(v)
-                return f if f > 0 else None
-            except (TypeError, ValueError):
-                return None
-
-        pmin = _parse_float(price_min)
-        pmax = _parse_float(price_max)
-        rmin = _parse_float(rating_min)
+        pmin, pmax, rmin = _normalize_filter_bounds(price_min, price_max, rating_min)
         if pmin is not None:
             filter_params["price_min"] = pmin
         if pmax is not None:
@@ -450,9 +564,17 @@ def start_server(
             try:
                 page = max(page, 1)
                 page_size = max(1, min(page_size, 40))
+                filter_active = any(v is not None for v in (pmin, pmax, rmin))
+                all_products_list = list(getattr(marketplace, "products", []))
 
-                # 获取足够多的商品以支持多页分页
-                fetch_limit = page_size * max(DEFAULT_WEB_MAX_PAGES, page)
+                # 启用筛选时扩大候选池，避免“先截断后筛选”导致单边筛选无结果。
+                fetch_limit_base = page_size * max(max_pages, page)
+                fetch_limit = fetch_limit_base
+                if filter_active:
+                    if all_products_list:
+                        fetch_limit = max(fetch_limit_base, len(all_products_list))
+                    else:
+                        fetch_limit = fetch_limit_base * 5
                 results = marketplace.search_products(query, limit=fetch_limit)
                 products = list(results.products)
 
@@ -464,9 +586,10 @@ def start_server(
                         cond_params = {"condition_name": condition_name}
                         logger.info(f"已应用条件 '{condition_name}'")
 
-                # 兼容小数据集：自动从全库补齐，支持多页分页
-                all_products_list = list(getattr(marketplace, "products", []))
-                target_count = min(page_size * DEFAULT_WEB_MAX_PAGES, len(all_products_list) if all_products_list else page_size)
+                # 兼容小数据集：自动从全库补齐
+                target_count = min(page_size * max_pages, len(all_products_list) if all_products_list else page_size)
+                if filter_active and all_products_list:
+                    target_count = len(all_products_list)
                 if len(products) < target_count and all_products_list:
                     products = _expand_products_for_pagination(
                         products=products,
@@ -483,8 +606,11 @@ def start_server(
                     rating_min=rmin,
                 )
 
+                # 最多展示 N 页，超出部分截断
+                max_items = page_size * max_pages
+                products = products[:max_items]
                 total_items = len(products)
-                total_pages = max(1, math.ceil(total_items / page_size)) if total_items else 1
+                total_pages = max(1, min(math.ceil(total_items / page_size), max_pages)) if total_items else 1
                 page = min(page, total_pages)
                 start_idx = (page - 1) * page_size
                 end_idx = start_idx + page_size
@@ -543,12 +669,13 @@ def start_server(
             product_data = _product_to_dict(p, desc_max_len=99999)
         except Exception as e:
             logger.warning(f"商品详情获取失败 {product_id}: {e}")
+        price_min, price_max, rating_min = _normalize_filter_bounds(price_min, price_max, rating_min)
         filter_params = {}
-        if price_min is not None and price_min > 0:
+        if price_min is not None:
             filter_params["price_min"] = price_min
-        if price_max is not None and price_max > 0:
+        if price_max is not None:
             filter_params["price_max"] = price_max
-        if rating_min is not None and rating_min > 0:
+        if rating_min is not None:
             filter_params["rating_min"] = rating_min
         return templates.TemplateResponse("product_detail.html", {
             "request": request,
@@ -563,17 +690,31 @@ def start_server(
     # 实时查看器页面
     @app.get("/viewer", response_class=HTMLResponse)
     async def viewer(request: Request):
+        _require_viewer_token_http(request)
         return templates.TemplateResponse("live_viewer.html", {
             "request": request
         })
+
+    @app.get("/dataset-admin", response_class=HTMLResponse)
+    async def dataset_admin(request: Request):
+        """数据集人工清洗页面（删除不符合类目要求的商品）。"""
+        _require_viewer_token_http(request)
+        return templates.TemplateResponse("dataset_admin.html", {
+            "request": request
+        })
+
+    @app.get("/dataset-adminr", response_class=HTMLResponse)
+    async def dataset_admin_typo_alias(request: Request):
+        """兼容常见拼写错误: /dataset-adminr -> /dataset-admin."""
+        return await dataset_admin(request)
     
     # WebSocket 端点（实时推送浏览器截图和日志）
-    from fastapi import WebSocket, WebSocketDisconnect
-    
     active_viewers: list = []
     
     @app.websocket("/ws/viewer")
     async def websocket_viewer(websocket: WebSocket):
+        if not await _require_viewer_token_ws(websocket):
+            return
         await websocket.accept()
         active_viewers.append(websocket)
         logger.info(f"Viewer 已连接 (总数: {len(active_viewers)})")
@@ -586,6 +727,170 @@ def start_server(
         except WebSocketDisconnect:
             active_viewers.remove(websocket)
             logger.info(f"Viewer 已断开 (剩余: {len(active_viewers)})")
+
+    def _category_to_file(category: str) -> Path:
+        cat = (category or "").strip()
+        if not cat:
+            raise HTTPException(status_code=400, detail="category 不能为空")
+        if not re.fullmatch(r"[A-Za-z0-9_\-]+", cat):
+            raise HTTPException(status_code=400, detail="category 非法")
+        fp = data_path / f"{cat}.json"
+        if not fp.exists():
+            raise HTTPException(status_code=404, detail=f"类目不存在: {cat}")
+        if not _is_product_dataset_file(fp):
+            raise HTTPException(status_code=400, detail=f"非商品数据文件: {cat}")
+        return fp
+
+    def _load_category_products(category: str) -> list[dict]:
+        fp = _category_to_file(category)
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"读取失败: {e}") from e
+        if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+            raise HTTPException(status_code=500, detail="类目数据结构非法（必须是 list[dict]）")
+        return data
+
+    def _save_category_products(category: str, products: list[dict]):
+        fp = _category_to_file(category)
+        try:
+            with open(fp, "w", encoding="utf-8") as f:
+                json.dump(products, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"写入失败: {e}") from e
+
+    def _reload_marketplace_products():
+        """删除后刷新内存商品表，保证立即生效。"""
+        try:
+            if hasattr(marketplace, "_load_all_products"):
+                products = marketplace._load_all_products()
+                marketplace.products = products
+                marketplace.product_lookup = {p.id: p for p in products}
+                logger.info(f"已刷新内存商品索引: {len(products)} items")
+        except Exception as e:
+            logger.warning(f"刷新内存商品索引失败: {e}")
+
+    @app.get("/api/admin/categories")
+    async def admin_categories(request: Request):
+        _require_viewer_token_http(request)
+        items = []
+        for fp in _list_product_dataset_files(data_path):
+            try:
+                with open(fp, "r", encoding="utf-8") as f:
+                    arr = json.load(f)
+                count = len(arr) if isinstance(arr, list) else 0
+            except Exception:
+                count = 0
+            items.append({"name": fp.stem, "count": count})
+        return {"categories": items}
+
+    @app.get("/api/admin/products")
+    async def admin_products(
+        request: Request,
+        category: str,
+        q: str = "",
+        page: int = 1,
+        page_size: int = 30,
+    ):
+        _require_viewer_token_http(request)
+        products = _load_category_products(category)
+        page = max(1, int(page))
+        page_size = max(1, min(int(page_size), 200))
+        keyword = (q or "").strip().lower()
+
+        indexed = list(enumerate(products))
+        if keyword:
+            def _match(item: tuple[int, dict]) -> bool:
+                _, p = item
+                text = f"{p.get('title', '')} {p.get('description', '')} {p.get('sku', '')}".lower()
+                return keyword in text
+            indexed = [x for x in indexed if _match(x)]
+
+        total = len(indexed)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paged = indexed[start:end]
+
+        rows = []
+        for idx, p in paged:
+            product_id = str(p.get("id") or p.get("sku") or "").strip()
+            detail_url = (
+                f"/product/{quote(product_id, safe='')}?q={quote(category)}&page=1&page_size=8"
+                if product_id else ""
+            )
+            rows.append({
+                "index": idx,
+                "sku": p.get("sku") or p.get("id") or f"{category}_{idx}",
+                "product_id": product_id,
+                "detail_url": detail_url,
+                "title": p.get("title", ""),
+                "price": p.get("price"),
+                "rating": p.get("rating"),
+                "image_url": p.get("image_url", ""),
+                "image_count": _count_product_images(p),
+                "review_count": _count_product_reviews(p),
+                "description": (p.get("description") or "")[:240],
+            })
+
+        total_pages = max(1, math.ceil(total / page_size)) if total else 1
+        return {
+            "category": category,
+            "query": q,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "products": rows,
+        }
+
+    @app.post("/api/admin/delete")
+    async def admin_delete_products(request: Request):
+        _require_viewer_token_http(request)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        category = (body.get("category") or "").strip()
+        indices = body.get("indices") or []
+        if not category:
+            raise HTTPException(status_code=400, detail="category 不能为空")
+        if not isinstance(indices, list) or not indices:
+            raise HTTPException(status_code=400, detail="indices 不能为空")
+
+        normalized: list[int] = []
+        for i in indices:
+            try:
+                normalized.append(int(i))
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"非法 index: {i}")
+        normalized = sorted(set(normalized), reverse=True)
+
+        products = _load_category_products(category)
+        before = len(products)
+        removed = []
+        for idx in normalized:
+            if 0 <= idx < len(products):
+                p = products.pop(idx)
+                removed.append({
+                    "index": idx,
+                    "sku": p.get("sku") or p.get("id") or f"{category}_{idx}",
+                    "title": p.get("title", ""),
+                })
+
+        _save_category_products(category, products)
+        _reload_marketplace_products()
+        after = len(products)
+        return {
+            "ok": True,
+            "category": category,
+            "before": before,
+            "after": after,
+            "deleted_count": before - after,
+            "deleted": list(reversed(removed)),
+            "note": "若当前使用 LlamaIndex 向量索引，建议重启服务并 rebuild-index 以彻底同步。",
+        }
     
     # JSON API: 商品搜索（供 verbal 模式等程序化调用）
     @app.get("/api/search")
@@ -604,7 +909,16 @@ def start_server(
         try:
             page = max(page, 1)
             page_size = max(1, min(page_size, 40))
-            fetch_limit = page_size * max(DEFAULT_WEB_MAX_PAGES, page)
+            price_min, price_max, rating_min = _normalize_filter_bounds(price_min, price_max, rating_min)
+            filter_active = any(v is not None for v in (price_min, price_max, rating_min))
+            all_products_list = list(getattr(marketplace, "products", []))
+            fetch_limit_base = page_size * max(max_pages, page)
+            fetch_limit = fetch_limit_base
+            if filter_active:
+                if all_products_list:
+                    fetch_limit = max(fetch_limit_base, len(all_products_list))
+                else:
+                    fetch_limit = fetch_limit_base * 5
             results = marketplace.search_products(q, limit=fetch_limit)
             products = list(results.products)
             if condition_set and condition_name:
@@ -612,8 +926,9 @@ def start_server(
                 if cond:
                     products = cond.apply(products)
 
-            all_products_list = list(getattr(marketplace, "products", []))
-            target_count = min(page_size * DEFAULT_WEB_MAX_PAGES, len(all_products_list) if all_products_list else page_size)
+            target_count = min(page_size * max_pages, len(all_products_list) if all_products_list else page_size)
+            if filter_active and all_products_list:
+                target_count = len(all_products_list)
             if len(products) < target_count and all_products_list:
                 products = _expand_products_for_pagination(
                     products=products,
@@ -629,8 +944,10 @@ def start_server(
                 rating_min=rating_min,
             )
 
+            max_items = page_size * max_pages
+            products = products[:max_items]
             total_items = len(products)
-            total_pages = max(1, math.ceil(total_items / page_size)) if total_items else 1
+            total_pages = max(1, min(math.ceil(total_items / page_size), max_pages)) if total_items else 1
             page = min(page, total_pages)
             start_idx = (page - 1) * page_size
             end_idx = start_idx + page_size
@@ -662,10 +979,134 @@ def start_server(
             logger.warning(f"API 商品详情获取失败 {product_id}: {e}")
             return {"product": None, "error": str(e)}
 
+    # 后台 Agent 进程（用于可交互启动）
+    agent_process = {"proc": None, "last_exit_code": None}
+
+    @app.post("/api/run-agent")
+    async def run_agent_api(request: Request):
+        """从 Viewer 网页触发展开 Agent。请求体: {query: str, perception: "visual"|"verbal"}"""
+        import subprocess
+        _require_viewer_token_http(request)
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        query = (body.get("query") or "").strip()
+        perception = (body.get("perception") or "visual").lower()
+        if perception not in ("visual", "verbal"):
+            perception = "visual"
+        if not query:
+            return {"ok": False, "error": "query 不能为空"}
+        if agent_process["proc"] is not None and agent_process["proc"].poll() is None:
+            return {"ok": False, "error": "Agent 正在运行中，请稍后再试"}
+        server_url = f"http://127.0.0.1:{port}"
+        script = Path(__file__).parent / "run_browser_agent.py"
+        # Keep viewer-run defaults aligned with the repeated distribution experiment pipeline.
+        viewer_llm = (os.getenv("ACES_VIEWER_LLM") or "qwen").strip() or "qwen"
+        try:
+            viewer_max_steps = int(os.getenv("ACES_VIEWER_MAX_STEPS", "45"))
+        except Exception:
+            viewer_max_steps = 45
+        verbal_use_vlm_default = (os.getenv("ACES_VIEWER_VERBAL_USE_VLM", "1") or "").strip().lower()
+        use_verbal_vlm = verbal_use_vlm_default not in {"0", "false", "no", "off"}
+        cmd = [
+            sys.executable, str(script),
+            "--llm", viewer_llm,
+            "--query", query,
+            "--perception", perception,
+            "--server", server_url,
+            "--max-steps", str(max(1, viewer_max_steps)),
+            "--once",
+        ]
+        if perception == "verbal" and use_verbal_vlm:
+            cmd.append("--verbal-use-vlm")
+        try:
+            env = os.environ.copy()
+            if viewer_token:
+                env["ACES_VIEWER_TOKEN"] = viewer_token
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(Path(__file__).parent),
+                # Inherit parent stdio to avoid PIPE backpressure deadlocks.
+                env=env,
+                start_new_session=True,
+            )
+            agent_process["proc"] = proc
+            agent_process["last_exit_code"] = None
+            logger.info(
+                "已启动 Agent: query=\"%s...\", perception=%s, llm=%s, max_steps=%s, verbal_use_vlm=%s",
+                query[:50],
+                perception,
+                viewer_llm,
+                max(1, viewer_max_steps),
+                bool(perception == "verbal" and use_verbal_vlm),
+            )
+            return {"ok": True, "message": f"Agent 已启动 ({perception} 模式)"}
+        except Exception as e:
+            logger.exception("启动 Agent 失败")
+            return {"ok": False, "error": str(e)}
+
+    @app.get("/api/agent-status")
+    async def agent_status(request: Request):
+        """查询 Agent 是否在运行"""
+        _require_viewer_token_http(request)
+        proc = agent_process.get("proc")
+        if proc is None:
+            return {
+                "running": False,
+                "pid": None,
+                "exit_code": agent_process.get("last_exit_code"),
+            }
+        exit_code = proc.poll()
+        running = exit_code is None
+        if running:
+            return {"running": True, "pid": proc.pid, "exit_code": None}
+        # Process finished; clear handle but keep exit code for UI.
+        agent_process["last_exit_code"] = int(exit_code)
+        agent_process["proc"] = None
+        return {"running": False, "pid": proc.pid, "exit_code": int(exit_code)}
+
+    @app.post("/api/stop-agent")
+    async def stop_agent_api(request: Request):
+        """终止当前运行中的 Agent 子进程。"""
+        import signal
+        _require_viewer_token_http(request)
+
+        proc = agent_process.get("proc")
+        if proc is None or proc.poll() is not None:
+            return {"ok": True, "message": "当前没有运行中的 Agent"}
+
+        try:
+            # Prefer killing the whole process group to avoid orphan children.
+            os.killpg(proc.pid, signal.SIGTERM)
+        except Exception:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+        try:
+            proc.wait(timeout=3)
+            agent_process["proc"] = None
+            agent_process["last_exit_code"] = int(proc.returncode) if proc.returncode is not None else None
+            return {"ok": True, "message": "Agent 已终止"}
+        except Exception:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            agent_process["proc"] = None
+            agent_process["last_exit_code"] = int(proc.returncode) if proc.returncode is not None else None
+            return {"ok": True, "message": "Agent 已强制终止"}
+
     # API 端点：推送截图和日志
     @app.post("/api/push")
-    async def push_to_viewers(data: dict):
+    async def push_to_viewers(request: Request, data: dict):
         """Agent 推送数据到所有 viewer"""
+        _require_viewer_token_http(request)
         disconnected = []
         for viewer in active_viewers:
             try:
@@ -685,7 +1126,7 @@ def start_server(
         return {
             "status": "healthy",
             "products_loaded": len(marketplace.products),
-            "categories": len(list(data_path.glob("*.json"))),
+            "categories": len(product_dataset_files),
             "active_viewers": len(active_viewers)
         }
     
@@ -710,18 +1151,19 @@ def start_server(
         pass
     
     print(f"\n可用的搜索词:")
-    json_files = list(data_path.glob("*.json"))
-    for json_file in json_files[:10]:  # 只显示前10个
+    for json_file in product_dataset_files[:10]:  # 只显示前10个
         print(f"  - {json_file.stem}")
     
+    viewer_suffix = f"?token={viewer_token}" if viewer_token else ""
+
     print(f"\n页面:")
     print(f"  - 商品搜索: http://localhost:{port}/search?q=mousepad")
-    print(f"  - 实时查看器: http://localhost:{port}/viewer (在 MacBook 打开此页面)")
+    print(f"  - 实时查看器: http://localhost:{port}/viewer{viewer_suffix} (在 MacBook 打开此页面)")
     print(f"  - 健康检查: http://localhost:{port}/health")
     
     if local_ip and local_ip != "127.0.0.1":
         print(f"\n从 MacBook 访问:")
-        print(f"  http://{local_ip}:{port}/viewer  ← 实时查看 Agent 操作")
+        print(f"  http://{local_ip}:{port}/viewer{viewer_suffix}  ← 实时查看 Agent 操作")
     
     print(f"\n按 Ctrl+C 停止服务器")
     print("="*60 + "\n")
@@ -782,6 +1224,23 @@ def main():
         default=None,
         help="实验条件 YAML/JSON 文件路径（如 configs/experiments/example_price_anchoring.yaml）"
     )
+    parser.add_argument(
+        "--max-pages", "-n",
+        type=int,
+        default=DEFAULT_WEB_MAX_PAGES,
+        help=f"每次最多展示页数（默认 {DEFAULT_WEB_MAX_PAGES}）"
+    )
+    parser.add_argument(
+        "--index-cache-dir",
+        type=str,
+        default=".cache/llamaindex",
+        help="LlamaIndex 向量索引缓存目录（默认: .cache/llamaindex）"
+    )
+    parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="强制重建向量索引并覆盖缓存"
+    )
     
     args = parser.parse_args()
     
@@ -794,6 +1253,9 @@ def main():
         host=args.host,
         use_llamaindex=use_llamaindex,
         condition_file=args.condition_file,
+        max_pages=args.max_pages,
+        index_cache_dir=args.index_cache_dir,
+        rebuild_index=args.rebuild_index,
     )
 
 

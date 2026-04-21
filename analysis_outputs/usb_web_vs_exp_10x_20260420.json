@@ -1,0 +1,173 @@
+{
+  "meta": {
+    "query": "usb_flash_drive price between 7.20 and 12.20",
+    "n_each": 10,
+    "ts": "2026-04-20 18:49:43"
+  },
+  "web_equivalent": {
+    "rows": [
+      {
+        "run": 1,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 24.75
+      },
+      {
+        "run": 2,
+        "rec": "usb_flash_drive_85",
+        "code": 0,
+        "elapsed": 25.74
+      },
+      {
+        "run": 3,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 21.17
+      },
+      {
+        "run": 4,
+        "rec": "usb_flash_drive_80",
+        "code": 0,
+        "elapsed": 21.6
+      },
+      {
+        "run": 5,
+        "rec": "usb_flash_drive_85",
+        "code": 0,
+        "elapsed": 27.03
+      },
+      {
+        "run": 6,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 21.19
+      },
+      {
+        "run": 7,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 25.86
+      },
+      {
+        "run": 8,
+        "rec": "usb_flash_drive_85",
+        "code": 0,
+        "elapsed": 29.56
+      },
+      {
+        "run": 9,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 25.0
+      },
+      {
+        "run": 10,
+        "rec": "usb_flash_drive_76",
+        "code": 0,
+        "elapsed": 27.69
+      }
+    ],
+    "distribution": {
+      "usb_flash_drive_76": {
+        "count": 6,
+        "prob": 0.6
+      },
+      "usb_flash_drive_85": {
+        "count": 3,
+        "prob": 0.3
+      },
+      "usb_flash_drive_80": {
+        "count": 1,
+        "prob": 0.1
+      }
+    }
+  },
+  "experiment_run_once": {
+    "rows": [
+      {
+        "run": 1,
+        "rec": "usb_flash_drive_85",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 24.341
+      },
+      {
+        "run": 2,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 25.512
+      },
+      {
+        "run": 3,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 23.669
+      },
+      {
+        "run": 4,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 22.189
+      },
+      {
+        "run": 5,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 20.646
+      },
+      {
+        "run": 6,
+        "rec": "usb_flash_drive_85",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 25.796
+      },
+      {
+        "run": 7,
+        "rec": "usb_flash_drive_86",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 20.93
+      },
+      {
+        "run": 8,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 23.289
+      },
+      {
+        "run": 9,
+        "rec": "usb_flash_drive_85",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 28.994
+      },
+      {
+        "run": 10,
+        "rec": "usb_flash_drive_76",
+        "status": "ok",
+        "attempts": 1,
+        "elapsed": 51.188
+      }
+    ],
+    "distribution": {
+      "usb_flash_drive_76": {
+        "count": 6,
+        "prob": 0.6
+      },
+      "usb_flash_drive_85": {
+        "count": 3,
+        "prob": 0.3
+      },
+      "usb_flash_drive_86": {
+        "count": 1,
+        "prob": 0.1
+      }
+    }
+  }
+}

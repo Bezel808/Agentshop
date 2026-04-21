@@ -1,0 +1,109 @@
+{
+  "timestamp": "2026-04-05T10:54:38",
+  "categories": {
+    "athletic_shoes": {
+      "count": 200,
+      "price_min": 20.0,
+      "price_median": 54.980000000000004,
+      "price_max": 160.39,
+      "best_5usd_window": [
+        41.99,
+        46.99,
+        31
+      ],
+      "best_10usd_window": [
+        41.99,
+        51.99,
+        51
+      ],
+      "forbid_hit": 0,
+      "must_miss": 3,
+      "forbid_samples": [],
+      "must_miss_samples": [
+        "DOUSSPRT Men's Water Shoes Quick Drying Sports Aqua Shoes",
+        "ON Men's Cloud Sneakers",
+        "Nike Men's Sneakers"
+      ]
+    },
+    "backpack": {
+      "count": 200,
+      "price_min": 9.99,
+      "price_median": 26.695,
+      "price_max": 39.99,
+      "best_5usd_window": [
+        24.99,
+        29.99,
+        54
+      ],
+      "best_10usd_window": [
+        19.99,
+        29.99,
+        88
+      ],
+      "forbid_hit": 0,
+      "must_miss": 0,
+      "forbid_samples": [],
+      "must_miss_samples": []
+    },
+    "bluetooth_speaker": {
+      "count": 200,
+      "price_min": 9.99,
+      "price_median": 17.99,
+      "price_max": 29.99,
+      "best_5usd_window": [
+        11.99,
+        16.99,
+        76
+      ],
+      "best_10usd_window": [
+        9.99,
+        19.99,
+        129
+      ],
+      "forbid_hit": 0,
+      "must_miss": 0,
+      "forbid_samples": [],
+      "must_miss_samples": []
+    },
+    "insulated_cup": {
+      "count": 200,
+      "price_min": 11.99,
+      "price_median": 16.424999999999997,
+      "price_max": 21.99,
+      "best_5usd_window": [
+        11.99,
+        16.99,
+        121
+      ],
+      "best_10usd_window": [
+        11.99,
+        21.99,
+        200
+      ],
+      "forbid_hit": 0,
+      "must_miss": 0,
+      "forbid_samples": [],
+      "must_miss_samples": []
+    },
+    "smart_watch": {
+      "count": 200,
+      "price_min": 4.99,
+      "price_median": 39.99,
+      "price_max": 134.95,
+      "best_5usd_window": [
+        24.99,
+        29.99,
+        34
+      ],
+      "best_10usd_window": [
+        19.99,
+        29.99,
+        52
+      ],
+      "forbid_hit": 0,
+      "must_miss": 0,
+      "forbid_samples": [],
+      "must_miss_samples": []
+    }
+  }
+}

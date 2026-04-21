@@ -42,6 +42,13 @@ class Action:
 
 
 @dataclass
+class ActionBatch:
+    """A batch of actions emitted from one model turn."""
+    actions: List[Action]
+    reasoning: Optional[str] = None
+
+
+@dataclass
 class ToolResult:
     """Result of executing a tool."""
     success: bool

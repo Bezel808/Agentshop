@@ -1,0 +1,270 @@
+{
+  "timestamp": "2026-04-05T09:41:48",
+  "price_range": [
+    15.0,
+    65.0
+  ],
+  "before": {
+    "athletic_shoes.json": {
+      "count": 309,
+      "priced": 309,
+      "min": 11.59,
+      "max": 179.99,
+      "median": 46.9
+    },
+    "backpack.json": {
+      "count": 84,
+      "priced": 84,
+      "min": 7.99,
+      "max": 266.93,
+      "median": 31.74
+    },
+    "bluetooth_speaker.json": {
+      "count": 133,
+      "priced": 133,
+      "min": 6.57,
+      "max": 499.0,
+      "median": 39.99
+    },
+    "insulated_cup.json": {
+      "count": 104,
+      "priced": 104,
+      "min": 8.95,
+      "max": 90.01,
+      "median": 21.979999999999997
+    },
+    "smart_watch.json": {
+      "count": 163,
+      "priced": 163,
+      "min": 4.99,
+      "max": 599.99,
+      "median": 48.99
+    }
+  },
+  "after_clean_non_athletic": {
+    "athletic_shoes.json": {
+      "count": 291,
+      "removed": 18
+    },
+    "backpack.json": {
+      "count": 84
+    },
+    "bluetooth_speaker.json": {
+      "count": 133
+    },
+    "insulated_cup.json": {
+      "count": 104
+    },
+    "smart_watch.json": {
+      "count": 163
+    }
+  },
+  "after_price_filter": {
+    "athletic_shoes.json": {
+      "count": 211,
+      "min": 15.97,
+      "max": 64.99,
+      "median": 43.88
+    },
+    "backpack.json": {
+      "count": 70,
+      "min": 15.99,
+      "max": 63.99,
+      "median": 31.99
+    },
+    "bluetooth_speaker.json": {
+      "count": 81,
+      "min": 15.29,
+      "max": 61.78,
+      "median": 29.99
+    },
+    "insulated_cup.json": {
+      "count": 72,
+      "min": 15.0,
+      "max": 64.99,
+      "median": 24.95
+    },
+    "smart_watch.json": {
+      "count": 108,
+      "min": 16.99,
+      "max": 59.99,
+      "median": 36.99
+    }
+  },
+  "target_count": 70,
+  "final": {
+    "athletic_shoes.json": {
+      "count": 70,
+      "min": 15.97,
+      "max": 64.99,
+      "median": 45.474999999999994
+    },
+    "backpack.json": {
+      "count": 70,
+      "min": 15.99,
+      "max": 63.99,
+      "median": 31.99
+    },
+    "bluetooth_speaker.json": {
+      "count": 70,
+      "min": 15.99,
+      "max": 61.78,
+      "median": 32.13
+    },
+    "insulated_cup.json": {
+      "count": 70,
+      "min": 15.0,
+      "max": 64.99,
+      "median": 24.83
+    },
+    "smart_watch.json": {
+      "count": 70,
+      "min": 16.99,
+      "max": 59.99,
+      "median": 39.99
+    }
+  },
+  "athletic_removed_non_athletic": [
+    {
+      "title": "STQ Slip On Breathe Mesh Walking Shoes Women Fashion Sneakers Comfort Wedge Platform Loafers",
+      "parent_asin": "B09P65M64Z",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "DUOYANGJIASHA Women's Comfortable Leather Loafers Casual Round Toe Moccasins Wild Driving Flats Soft Walking Shoes Women Slip On",
+      "parent_asin": "B081ZN2R9K",
+      "patterns": [
+        "\\bloafer(s)?\\b",
+        "\\bmoccasin(s)?\\b",
+        "\\bdriving\\s+flats?\\b"
+      ]
+    },
+    {
+      "title": "Ablanczoom Womens Comfortable Leather Floral Print Flats Casual Driving Loafers Walking Shoes for Women",
+      "parent_asin": "B07JNY4HJ9",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "Women's Slip on Sneakers Womens Canvas Slip on Shoes Fashion Canvas Sneakers for Women Non Slip Loafers Casual Shoes",
+      "parent_asin": "B0922PZRJ7",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "COSIDRAM Mens Casual Shoes Sneakers Loafers Comfort Walking Shoes for Male Business Work Office Dress",
+      "parent_asin": "B07SWVVJ8B",
+      "patterns": [
+        "\\bdress\\b",
+        "\\bloafer(s)?\\b",
+        "\\bbusiness\\b",
+        "\\boffice\\b"
+      ]
+    },
+    {
+      "title": "Skechers Men's Gowalk 4 Incredible-Athletic Slip-on Casual Loafer Walking Shoe",
+      "parent_asin": "B0BKLKLDSX",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "Nsasy Kids Roller Shoes Boy Girl Sneakers with Wheels Become Sport Sneaker with Led for Christmas Birthday Children Show Gift",
+      "parent_asin": "B08S2RWH69",
+      "patterns": [
+        "\\broller\\b",
+        "\\bwheels?\\b"
+      ]
+    },
+    {
+      "title": "Meckior Infant Baby Girls Soft Sole Bowknot Princess Wedding Dress Mary Jane Flats Prewalker Newborn Light Baby Sneaker Shoes",
+      "parent_asin": "B085NSLY28",
+      "patterns": [
+        "\\bdress\\b",
+        "\\bmary\\s+jane\\b",
+        "\\bwedding\\b"
+      ]
+    },
+    {
+      "title": "STQ Loafers for Women Memory Foam Slip On Sneakers Comfort Fall Shoes",
+      "parent_asin": "B083J69D5Q",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "Skechers Men's Gowalk 5-Elastic Stretch Athletic Slip-on Casual Loafer Walking Shoe Sneaker",
+      "parent_asin": "B0BV6F5PNW",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "Bruno Marc Men's Rivera Oxfords Shoes Sneakers",
+      "parent_asin": "B08KXZ6HDY",
+      "patterns": [
+        "\\boxford(s)?\\b"
+      ]
+    },
+    {
+      "title": "Meckior Infant Baby Girls Boys Canvas Shoes Soft Sole Toddler Slip On Newborn Crib Moccasins Casual Sneaker Austin Boy's Flat Lazy Loafers First Walkers Skate Shoe",
+      "parent_asin": "B07PFCZ1H9",
+      "patterns": [
+        "\\bloafer(s)?\\b",
+        "\\bmoccasin(s)?\\b",
+        "\\bskate\\b"
+      ]
+    },
+    {
+      "title": "Bruno Marc Men's Mesh Sneakers Oxfords Lightweight Shoes",
+      "parent_asin": "B0BH5MJPGS",
+      "patterns": [
+        "\\boxford(s)?\\b"
+      ]
+    },
+    {
+      "title": "Etnies Mens Kingpin Skate Skate Sneakers Casual Shoes Casual - Black",
+      "parent_asin": "B09MW2281C",
+      "patterns": [
+        "\\bskate\\b"
+      ]
+    },
+    {
+      "title": "ZZHAP Men's Casual Oxford Shoes Breathable Flat Fashion Sneakers",
+      "parent_asin": "B074M9ZVWZ",
+      "patterns": [
+        "\\boxford(s)?\\b"
+      ]
+    },
+    {
+      "title": "COSIDRAM Mens Casual Shoes Fashion Sneakers Dress Shoes for Men Walking Shoes Business Office Comfort Loafers",
+      "parent_asin": "B07VWW1DHG",
+      "patterns": [
+        "\\bdress\\b",
+        "\\bloafer(s)?\\b",
+        "\\bbusiness\\b",
+        "\\boffice\\b"
+      ]
+    },
+    {
+      "title": "COSIDRAM Mens Loafer Casual Shoes Comfort Lightweight Driving Travel Walking Shoes for Adult Male",
+      "parent_asin": "B07QCK8Y7D",
+      "patterns": [
+        "\\bloafer(s)?\\b"
+      ]
+    },
+    {
+      "title": "SDSPEED Kids Roller Skate Shoes with Single Wheel Shoes Sport Sneaker LED",
+      "parent_asin": "B07HF93TYM",
+      "patterns": [
+        "\\broller\\b",
+        "\\bwheels?\\b",
+        "\\bskate\\b"
+      ]
+    }
+  ]
+}

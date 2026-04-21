@@ -21,6 +21,7 @@ class StepType(Enum):
     THOUGHT = "thought"
     ACTION = "action"
     TOOL_RESULT = "tool_result"
+    TERMINATION = "termination"
 
 
 @dataclass

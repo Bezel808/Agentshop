@@ -45,15 +45,48 @@ class BaseTool(Tool):
             input_schema=self._input_schema,
         )
     
+    def _coerce_parameters(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Coerce parameters to match schema (e.g. LLM may return "1" for integer).
+        Override in subclasses for custom coercion.
+        """
+        if not parameters:
+            return parameters
+        schema = self._input_schema
+        props = schema.get("properties", {})
+        result = dict(parameters)
+        for key, spec in props.items():
+            if key not in result:
+                continue
+            val = result[key]
+            if val is None:
+                continue
+            type_spec = spec.get("type")
+            if isinstance(type_spec, list):
+                type_spec = type_spec[0] if type_spec else None
+            if type_spec == "integer" and isinstance(val, str):
+                try:
+                    result[key] = int(float(val))
+                except (ValueError, TypeError):
+                    pass
+            elif type_spec == "number" and isinstance(val, str):
+                try:
+                    result[key] = float(val)
+                except (ValueError, TypeError):
+                    pass
+        return result
+
     def execute(self, parameters: Dict[str, Any]) -> ToolResult:
         """
         Execute the tool with validation.
         
         This method:
-        1. Validates parameters
-        2. Calls the implementation
-        3. Wraps result in ToolResult
+        1. Coerces parameters to match schema
+        2. Validates parameters
+        3. Calls the implementation
+        4. Wraps result in ToolResult
         """
+        parameters = self._coerce_parameters(parameters or {})
         # Validate parameters
         if not self.validate_parameters(parameters):
             return ToolResult(
@@ -65,7 +98,19 @@ class BaseTool(Tool):
         try:
             # Call implementation
             data = self._execute_impl(parameters)
-            
+
+            # If tool returns a structured payload with explicit success flag,
+            # propagate it to ToolResult.success so orchestrator error handling works.
+            if isinstance(data, dict) and "success" in data:
+                payload_success = bool(data.get("success"))
+                err = data.get("error")
+                return ToolResult(
+                    success=payload_success,
+                    data=data,
+                    error=str(err) if (err and not payload_success) else None,
+                    metadata={"tool": self._name}
+                )
+
             return ToolResult(
                 success=True,
                 data=data,
@@ -94,7 +139,7 @@ class BaseTool(Tool):
             )
             return True
         except jsonschema.ValidationError as e:
-            logger.error(f"Parameter validation failed: {e}")
+            logger.error(f"Parameter validation failed for {self._name}: {e}. params={parameters}")
             return False
     
     # ========================================================================

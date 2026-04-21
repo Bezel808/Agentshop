@@ -1,0 +1,176 @@
+{
+  "timestamp": "2026-04-05T10:45:44",
+  "target": 200,
+  "backup_dir": "datasets_40_work/archive_20260405_104544_pre_clean3/enriched",
+  "categories": {
+    "athletic_shoes": {
+      "pool_count": 1183,
+      "dedup_count": 336,
+      "valid_count": 300,
+      "removed_reasons": {
+        "exclude_non_athletic_or_accessory": 22,
+        "no_athletic_signal": 14
+      },
+      "final_count": 200,
+      "final_price_min": 20.0,
+      "final_price_median": 42.99,
+      "final_price_max": 60.0,
+      "selected_window": [
+        20.0,
+        60.0,
+        203,
+        40
+      ],
+      "sources": {
+        "datasets_40_work/raw/athletic_shoes_men.json": 31,
+        "datasets_40_work/raw/athletic_shoes_women.json": 19,
+        "datasets_40_work/enriched/athletic_shoes.json": 96,
+        "datasets_40_work/archive_20260405_104127_pre_clean2/enriched/athletic_shoes.json": 200,
+        "datasets_40_work/archive_20260405_102811_pre_clean/enriched/athletic_shoes.json": 200,
+        "datasets_40_work/archive_20260405_095947_before_targeted_expand/enriched/athletic_shoes.json": 309,
+        "datasets_40_work/archive_20260405_093935_five_set_balance/enriched/athletic_shoes.json": 309,
+        "datasets_40_work/rebuild_20260405/raw_enriched_all/athletic_shoes_women.json": 19
+      }
+    },
+    "backpack": {
+      "pool_count": 1971,
+      "dedup_count": 501,
+      "valid_count": 303,
+      "removed_reasons": {
+        "no_backpack_signal": 133,
+        "exclude_non_backpack": 65
+      },
+      "final_count": 200,
+      "final_price_min": 9.99,
+      "final_price_median": 26.695,
+      "final_price_max": 39.99,
+      "selected_window": [
+        9.99,
+        39.99,
+        220,
+        30
+      ],
+      "sources": {
+        "datasets_40_work/raw/backpack_men.json": 163,
+        "datasets_40_work/raw/backpack_women.json": 40,
+        "datasets_40_work/enriched/backpack.json": 200,
+        "datasets_40_work/archive_20260405_104127_pre_clean2/enriched/backpack.json": 200,
+        "datasets_40_work/archive_20260405_102811_pre_clean/enriched/backpack.json": 200,
+        "datasets_40_work/archive_20260405_095947_before_targeted_expand/enriched/backpack.json": 84,
+        "datasets_40_work/archive_20260405_093935_five_set_balance/enriched/backpack.json": 84,
+        "datasets_40_work/rebuild_20260405/expand_targeted/backpack_men.json": 500,
+        "datasets_40_work/rebuild_20260405/expand_targeted/backpack_women.json": 500
+      }
+    },
+    "bluetooth_speaker": {
+      "pool_count": 1406,
+      "dedup_count": 514,
+      "valid_count": 469,
+      "removed_reasons": {
+        "exclude_non_speaker": 43,
+        "no_speaker_signal": 2
+      },
+      "final_count": 200,
+      "final_price_min": 9.99,
+      "final_price_median": 17.99,
+      "final_price_max": 29.99,
+      "selected_window": [
+        9.99,
+        29.99,
+        214,
+        20
+      ],
+      "sources": {
+        "datasets_40_work/raw/bluetooth_speaker.json": 40,
+        "datasets_40_work/enriched/bluetooth_speaker.json": 200,
+        "datasets_40_work/archive_20260405_104127_pre_clean2/enriched/bluetooth_speaker.json": 200,
+        "datasets_40_work/archive_20260405_102811_pre_clean/enriched/bluetooth_speaker.json": 200,
+        "datasets_40_work/archive_20260405_095947_before_targeted_expand/enriched/bluetooth_speaker.json": 133,
+        "datasets_40_work/archive_20260405_093935_five_set_balance/enriched/bluetooth_speaker.json": 133,
+        "datasets_40_work/rebuild_20260405/expand_targeted/bluetooth_speaker.json": 500
+      }
+    },
+    "insulated_cup": {
+      "pool_count": 4367,
+      "dedup_count": 1201,
+      "valid_count": 644,
+      "removed_reasons": {
+        "no_vessel_signal": 46,
+        "no_insulated_signal": 381,
+        "exclude_non_insulated_or_accessory": 130
+      },
+      "final_count": 200,
+      "final_price_min": 11.99,
+      "final_price_median": 18.99,
+      "final_price_max": 26.99,
+      "selected_window": [
+        11.99,
+        26.99,
+        424,
+        15
+      ],
+      "sources": {
+        "datasets_40_work/raw/insulated_cup_men.json": 162,
+        "datasets_40_work/raw/insulated_cup_women.json": 161,
+        "datasets_40_work/enriched/insulated_cup.json": 95,
+        "datasets_40_work/archive_20260405_104127_pre_clean2/enriched/insulated_cup.json": 141,
+        "datasets_40_work/archive_20260405_102811_pre_clean/enriched/insulated_cup.json": 200,
+        "datasets_40_work/archive_20260405_095947_before_targeted_expand/enriched/insulated_cup.json": 104,
+        "datasets_40_work/archive_20260405_093935_five_set_balance/enriched/insulated_cup.json": 104,
+        "datasets_40_work/rebuild_20260405/expand_targeted/insulated_cup_men.json": 500,
+        "datasets_40_work/rebuild_20260405/expand_targeted/insulated_cup_women.json": 500,
+        "datasets_40_work/rebuild_20260405/expand_targeted_deep/insulated_cup_men.json": 1200,
+        "datasets_40_work/rebuild_20260405/expand_targeted_deep/insulated_cup_women.json": 1200
+      }
+    },
+    "smart_watch": {
+      "pool_count": 1317,
+      "dedup_count": 240,
+      "valid_count": 237,
+      "removed_reasons": {
+        "exclude_watch_accessory": 3
+      },
+      "final_count": 200,
+      "final_price_min": 4.99,
+      "final_price_median": 39.99,
+      "final_price_max": 134.95,
+      "selected_window": [
+        4.99,
+        104.99,
+        193,
+        "fallback"
+      ],
+      "sources": {
+        "datasets_40_work/raw/smart_watch.json": 240,
+        "datasets_40_work/enriched/smart_watch.json": 111,
+        "datasets_40_work/archive_20260405_104127_pre_clean2/enriched/smart_watch.json": 200,
+        "datasets_40_work/archive_20260405_102811_pre_clean/enriched/smart_watch.json": 200,
+        "datasets_40_work/archive_20260405_095947_before_targeted_expand/enriched/smart_watch.json": 163,
+        "datasets_40_work/archive_20260405_093935_five_set_balance/enriched/smart_watch.json": 163,
+        "datasets_40_work/rebuild_20260405/raw_enriched_all/smart_watch.json": 240
+      }
+    }
+  },
+  "post_audit": {
+    "athletic_shoes": {
+      "suspect_count": 0,
+      "samples": []
+    },
+    "backpack": {
+      "suspect_count": 0,
+      "samples": []
+    },
+    "bluetooth_speaker": {
+      "suspect_count": 0,
+      "samples": []
+    },
+    "insulated_cup": {
+      "suspect_count": 0,
+      "samples": []
+    },
+    "smart_watch": {
+      "suspect_count": 0,
+      "samples": []
+    }
+  }
+}

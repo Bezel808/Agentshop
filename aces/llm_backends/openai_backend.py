@@ -135,10 +135,14 @@ class OpenAIBackend(LLMBackend):
             # Handle different content types
             if isinstance(msg.content, dict):
                 # Multimodal content (e.g., image)
-                if msg.content.get("type") == "image":
+                if msg.content.get("type") in {"image", "image_with_prompt"}:
+                    blocks = []
+                    text = msg.content.get("text")
+                    if text:
+                        blocks.append({"type": "text", "text": str(text)})
                     openai_messages.append({
                         "role": msg.role,
-                        "content": [
+                        "content": blocks + [
                             {
                                 "type": "image_url",
                                 "image_url": {
@@ -146,7 +150,7 @@ class OpenAIBackend(LLMBackend):
                                     "detail": "high",
                                 }
                             }
-                        ]
+                        ],
                     })
                 else:
                     # Other structured content
@@ -155,11 +159,26 @@ class OpenAIBackend(LLMBackend):
                         "content": str(msg.content),
                     })
             else:
-                # Text content
-                openai_messages.append({
-                    "role": msg.role,
-                    "content": str(msg.content),
-                })
+                content_str = str(msg.content)
+                if content_str.startswith("data:image/"):
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": content_str,
+                                    "detail": "high",
+                                },
+                            }
+                        ],
+                    })
+                else:
+                    # Text content
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": content_str,
+                    })
         
         return openai_messages
     
@@ -184,20 +203,39 @@ class OpenAIBackend(LLMBackend):
         
         # Check if there are tool calls
         if message.tool_calls:
-            tool_call = message.tool_calls[0]  # Take first one
-            
-            # Parse arguments safely
             import json
-            try:
-                parameters = json.loads(tool_call.function.arguments)
-            except:
-                parameters = {}
-            
+            tool_calls = []
+            for tool_call in message.tool_calls:
+                try:
+                    parameters = json.loads(tool_call.function.arguments)
+                except Exception:
+                    parameters = {}
+                tool_calls.append(
+                    {
+                        "id": tool_call.id,
+                        "name": tool_call.function.name,
+                        "parameters": parameters,
+                    }
+                )
+
             content = {
-                "tool_call": {
-                    "id": tool_call.id,
-                    "name": tool_call.function.name,
-                    "parameters": parameters,
+                "tool_calls": tool_calls,
+                # Keep legacy field for compatibility with older parser paths.
+                "tool_call": tool_calls[0],
+                "reasoning": message.content or "",
+            }
+        elif getattr(message, "function_call", None):
+            import json
+            fn = message.function_call
+            args = getattr(fn, "arguments", None) or "{}"
+            try:
+                parameters = json.loads(args) if isinstance(args, str) else (args or {})
+            except Exception:
+                parameters = {}
+            content = {
+                "function_call": {
+                    "name": getattr(fn, "name", ""),
+                    "arguments": parameters,
                 },
                 "reasoning": message.content or "",
             }

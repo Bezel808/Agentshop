@@ -38,9 +38,9 @@ awk '
     match($0, /(kimi|qwen)-[a-z]+-r[0-9]+/)
     if (RSTART) cond = substr($0, RSTART, RLENGTH)
   }
-  /推荐商品 ID:/ {
+  /推荐商品 ID:|Recommended Product ID:/ {
     line = $0
-    sub(/.*推荐商品 ID: */, "", line)
+    sub(/.*(推荐商品 ID:|Recommended Product ID:) */, "", line)
     sub(/ *=.*/, "", line)
     gsub(/^ +| +$/, "", line)
     pid = line
@@ -56,9 +56,9 @@ awk '
     match($0, /(kimi|qwen)-[a-z]+-r[0-9]+/)
     if (RSTART) cond = substr($0, RSTART, RLENGTH)
   }
-  /推荐商品 ID:/ {
+  /推荐商品 ID:|Recommended Product ID:/ {
     line = $0
-    sub(/.*推荐商品 ID: */, "", line)
+    sub(/.*(推荐商品 ID:|Recommended Product ID:) */, "", line)
     sub(/ *=.*/, "", line)
     gsub(/^ +| +$/, "", line)
     pid = line

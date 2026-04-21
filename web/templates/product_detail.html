@@ -1,49 +1,12 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>{% if product %}{{ product.title[:60] }}...{% else %}Product{% endif %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        .detail-back { margin-bottom: 16px; }
-        .detail-back a { color: #007185; text-decoration: none; }
-        .detail-back a:hover { text-decoration: underline; }
-        .detail-layout { max-width: 900px; margin: 0 auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .detail-top { display: flex; gap: 24px; margin-bottom: 24px; }
-        .detail-image { flex-shrink: 0; width: 280px; height: 280px; display: flex; align-items: center; justify-content: center; background: #f8f8f8; border-radius: 8px; overflow: hidden; }
-        .detail-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .detail-meta { flex-grow: 1; }
-        .detail-title { font-size: 20px; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
-        .detail-rating { font-size: 14px; margin-bottom: 8px; }
-        .detail-price { font-size: 24px; font-weight: 600; color: #B12704; margin-bottom: 16px; }
-        .detail-badges { margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
-        .detail-description { border-top: 1px solid #eee; padding-top: 20px; }
-        .detail-description h3 { font-size: 16px; margin-bottom: 10px; }
-        .detail-description .text { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #0F1111; }
-        .detail-description .empty { color: #888; font-style: italic; }
-        .detail-gallery { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
-        .detail-gallery h3 { font-size: 16px; margin-bottom: 10px; }
-        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-        .gallery-item { background: #f8f8f8; border-radius: 6px; overflow: hidden; height: 150px; display: flex; align-items: center; justify-content: center; }
-        .gallery-item img { width: 100%; height: 100%; object-fit: contain; }
-        .review-images { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
-        .review-images img { width: 100%; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; background: #fff; }
-        .detail-reviews { border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px; }
-        .detail-reviews h3 { font-size: 16px; margin-bottom: 10px; }
-        .review-list { display: flex; flex-direction: column; gap: 12px; }
-        .review-item { border: 1px solid #e6e6e6; border-radius: 8px; padding: 12px; background: #fafafa; }
-        .review-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-        .review-meta { color: #666; font-size: 12px; margin-bottom: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
-        .review-text { font-size: 14px; color: #222; line-height: 1.5; white-space: pre-wrap; }
-        .detail-actions { margin-top: 20px; }
-        .detail-actions .add-to-cart { padding: 10px 24px; background: #FFD814; border: 1px solid #FCD200; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
-        .detail-actions .add-to-cart:hover { background: #F7CA00; }
-        .detail-error { padding: 40px; text-align: center; color: #666; }
-    </style>
 </head>
-
-<body>
+{% set cond_name = (condition_params or {}).get('condition_name', '') %}
+<body class="{% if cond_name %}condition-{{ cond_name }}{% endif %}">
     {% set cond_qs = "" %}
     {% for k, v in (condition_params or {}).items() %}
         {% set cond_qs = cond_qs ~ "&" ~ k ~ "=" ~ v %}
@@ -56,142 +19,136 @@
     <div class="header">
         <div class="search-container">
             <form action="/search" method="get" id="search-form">
-                <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products...">
+                <input type="text" name="q" value="{{ query or '' }}" id="search" placeholder="Search for products..." autofocus>
                 {% for k, v in (condition_params or {}).items() %}
                 <input type="hidden" name="{{ k }}" value="{{ v }}">
                 {% endfor %}
                 {% for k, v in (filter_params or {}).items() %}
                 <input type="hidden" name="{{ k }}" value="{{ v }}">
                 {% endfor %}
-                <button type="submit"><span class="search-icon">🔍</span></button>
+                <button type="submit">
+                    <span class="search-icon">🔍</span>
+                </button>
             </form>
         </div>
     </div>
 
-    <div class="detail-back" style="max-width: 900px; margin: 20px auto; padding: 0 20px;">
-        {% if query %}
-        <a href="/search?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ page or 1 }}&page_size={{ page_size or 8 }}">← Back to search "{{ query }}"</a>
-        {% else %}
-        <a href="/search">← Back to search</a>
-        {% endif %}
-    </div>
+    <main class="detail-page">
+        <div class="detail-back">
+            {% if query %}
+            <a href="/search?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ page or 1 }}&page_size={{ page_size or 8 }}">← Back to results</a>
+            {% else %}
+            <a href="/search">← Back to search</a>
+            {% endif %}
+        </div>
 
-    {% if product %}
-    <div class="detail-layout">
-        <div class="detail-top">
-            <div class="detail-image">
-                {% if product.image_url %}
-                <img src="{{ product.image_url }}" alt="{{ product.title }}">
-                {% else %}
-                <div class="placeholder-image">📦</div>
-                {% endif %}
+        {% if product %}
+        <section class="detail-panel">
+            <div class="detail-hero">
+                <div class="detail-gallery-column">
+                    <div class="detail-main-image">
+                        {% if product.image_url %}
+                        <img src="{{ product.image_url }}" alt="{{ product.title }}">
+                        {% else %}
+                        <div class="placeholder-image">📦</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="detail-info-column">
+                    <div class="result-item-id">ID: {{ product.id }}</div>
+                    <h1 class="detail-title">{{ product.title }}</h1>
+
+                    <div class="product-badges inline-badges">
+                        {% if product.best_seller %}<span class="badge bestseller">Best Seller</span>{% endif %}
+                        {% if product.overall_pick %}<span class="badge choice">Overall Pick</span>{% endif %}
+                        {% if product.sponsored %}<span class="badge sponsored">Sponsored</span>{% endif %}
+                        {% if product.low_stock %}<span class="badge deal">Only a few left</span>{% endif %}
+                        {% for cb in (product.custom_badges or []) %}<span class="badge custom">{{ cb }}</span>{% endfor %}
+                    </div>
+
+                    <div class="product-rating detail-rating-line">
+                        {% set rating = product.rating|float %}
+                        {% if rating > 0 %}
+                            {% for _ in range(rating|int) %}<span class="star filled">★</span>{% endfor %}
+                            {% if (rating % 1) >= 0.5 %}<span class="star filled">★</span>{% endif %}
+                            {% for _ in range(5 - rating|round|int) %}<span class="star empty">☆</span>{% endfor %}
+                            <span class="rating-count">{{ product.rating_count }} ratings</span>
+                        {% else %}
+                            <span class="no-rating">No ratings yet</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="detail-description-block">
+                        <h3>About this item</h3>
+                        {% if product.description %}
+                        <p>{{ product.description }}</p>
+                        {% else %}
+                        <p class="text-empty">No description available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <aside class="detail-buybox-column">
+                    <div class="buybox-card">
+                        <div class="buybox-price">${{ "%.2f"|format(product.price|float) }}</div>
+                        {% if product.original_price %}
+                        <div class="buybox-list-price">List: ${{ "%.2f"|format(product.original_price|float) }}</div>
+                        {% endif %}
+                        <div class="buybox-stock">In Stock</div>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                </aside>
             </div>
-            <div class="detail-meta">
-                <span class="detail-product-id" style="font-size:12px;color:#666;font-family:monospace;display:block;margin-bottom:6px;">ID: {{ product.id }}</span>
-                <h1 class="detail-title">{{ product.title }}</h1>
 
-                <div class="detail-badges">
-                    {% if product.best_seller %}
-                    <span class="badge bestseller">Best Seller</span>
-                    {% endif %}
-                    {% if product.overall_pick %}
-                    <span class="badge choice">Overall Pick</span>
-                    {% endif %}
-                    {% if product.sponsored %}
-                    <span class="badge sponsored">Sponsored</span>
-                    {% endif %}
-                    {% if product.low_stock %}
-                    <span class="badge deal">Only a few left</span>
-                    {% endif %}
-                    {% for cb in (product.custom_badges or []) %}
-                    <span class="badge custom">{{ cb }}</span>
+            {% if product.gallery_images and product.gallery_images|length > 0 %}
+            <section class="detail-extra-gallery">
+                <h3>More product images</h3>
+                <div class="detail-extra-grid">
+                    {% for image_url in product.gallery_images[:12] %}
+                    <div class="detail-extra-item">
+                        <img src="{{ image_url }}" alt="{{ product.title }} gallery image {{ loop.index }}" loading="lazy">
+                    </div>
                     {% endfor %}
                 </div>
-
-                <div class="detail-rating">
-                    {% set rating = product.rating|float %}
-                    {% if rating > 0 %}
-                        {% for _ in range(rating|int) %}<span class="star filled">★</span>{% endfor %}
-                        {% if (rating % 1) >= 0.5 %}<span class="star filled">★</span>{% endif %}
-                        {% for _ in range(5 - rating|round|int) %}<span class="star empty">☆</span>{% endfor %}
-                        <span class="rating-count">({{ product.rating_count }})</span>
-                    {% else %}
-                        <span class="no-rating">No ratings yet</span>
-                    {% endif %}
-                </div>
-                <div class="detail-price">
-                    {% if product.original_price %}
-                    <span class="original-price">${{ "%.2f"|format(product.original_price|float) }}</span>
-                    {% endif %}
-                    ${{ "%.2f"|format(product.price|float) }}
-                </div>
-                <div class="detail-actions">
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
-        </div>
-        <div class="detail-description">
-            <h3>Product Description</h3>
-            {% if product.description %}
-            <div class="text">{{ product.description }}</div>
-            {% else %}
-            <div class="text empty">No description available.</div>
+            </section>
             {% endif %}
-        </div>
 
-        {% if product.gallery_images and product.gallery_images|length > 0 %}
-        <div class="detail-gallery">
-            <h3>Product Images</h3>
-            <div class="gallery-grid">
-                {% for image_url in product.gallery_images %}
-                <div class="gallery-item">
-                    <img src="{{ image_url }}" alt="{{ product.title }} image {{ loop.index }}" loading="lazy">
+            <section class="detail-reviews">
+                <h3>Customer reviews</h3>
+                {% if product.reviews and product.reviews|length > 0 %}
+                <div class="review-list">
+                    {% for review in product.reviews %}
+                    <article class="review-item">
+                        {% if review.title %}<div class="review-title">{{ review.title }}</div>{% endif %}
+                        <div class="review-meta">
+                            {% if review.rating %}<span>{{ review.rating }}★</span>{% endif %}
+                            {% if review.author %}<span>{{ review.author }}</span>{% endif %}
+                            {% if review.date %}<span>{{ review.date }}</span>{% endif %}
+                        </div>
+                        {% if review.text %}<p class="review-text">{{ review.text }}</p>{% endif %}
+                        {% if review.review_images and review.review_images|length > 0 %}
+                        <div class="review-images">
+                            {% for img in review.review_images[:6] %}
+                            <img src="{{ img }}" alt="review image {{ loop.index }}" loading="lazy">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </article>
+                    {% endfor %}
                 </div>
-                {% endfor %}
+                {% else %}
+                <p class="text-empty">No user reviews available.</p>
+                {% endif %}
+            </section>
+        </section>
+        {% else %}
+        <section class="detail-panel">
+            <div class="empty-state">
+                <p>Product not found.</p>
             </div>
-        </div>
+        </section>
         {% endif %}
-
-        <div class="detail-reviews">
-            <h3>User Reviews</h3>
-            {% if product.reviews and product.reviews|length > 0 %}
-            <div class="review-list">
-                {% for review in product.reviews %}
-                <div class="review-item">
-                    {% if review.title %}
-                    <div class="review-title">{{ review.title }}</div>
-                    {% endif %}
-                    <div class="review-meta">
-                        {% if review.rating %}<span>Rating: {{ review.rating }}</span>{% endif %}
-                        {% if review.author %}<span>By {{ review.author }}</span>{% endif %}
-                        {% if review.date %}<span>{{ review.date }}</span>{% endif %}
-                    </div>
-                    {% if review.text %}
-                    <div class="review-text">{{ review.text }}</div>
-                    {% endif %}
-                    {% if review.review_images and review.review_images|length > 0 %}
-                    <div class="review-images">
-                        {% for img in review.review_images %}
-                        <img src="{{ img }}" alt="review image {{ loop.index }}" loading="lazy">
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="text empty">No user reviews available.</div>
-            {% endif %}
-        </div>
-    </div>
-    {% else %}
-    <div class="detail-layout">
-        <div class="detail-error">
-            <p>Product not found or could not be loaded.</p>
-            <p><a href="/search">Back to search</a></p>
-        </div>
-    </div>
-    {% endif %}
+    </main>
 </body>
-
 </html>

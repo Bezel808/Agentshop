@@ -4,10 +4,13 @@
 <head>
     <title>{% if query %}{{ query }} - {% endif %}Product Search</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://m.media-amazon.com" crossorigin>
+    <link rel="dns-prefetch" href="//m.media-amazon.com">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 
-<body>
+{% set cond_name = (condition_params or {}).get('condition_name', '') %}
+<body class="{% if cond_name %}condition-{{ cond_name }}{% endif %}">
     <div class="header">
         <div class="search-container">
             <form action="/search" method="get" id="search-form">
@@ -27,13 +30,12 @@
         </div>
     </div>
 
-    {% set cond_qs = "" %}
+    {% set qs = namespace(cond="", filter="") %}
     {% for k, v in (condition_params or {}).items() %}
-        {% set cond_qs = cond_qs ~ "&" ~ k ~ "=" ~ v %}
+        {% set qs.cond = qs.cond ~ "&" ~ (k | urlencode) ~ "=" ~ (v | string | urlencode) %}
     {% endfor %}
-    {% set filter_qs = "" %}
     {% for k, v in (filter_params or {}).items() %}
-        {% set filter_qs = filter_qs ~ "&" ~ k ~ "=" ~ v %}
+        {% set qs.filter = qs.filter ~ "&" ~ (k | urlencode) ~ "=" ~ (v | string | urlencode) %}
     {% endfor %}
 
     {% if query %}
@@ -73,14 +75,14 @@
             </select>
             <button type="submit" class="filter-btn">Apply</button>
             {% if filter_params %}
-            <a href="/search?q={{ query | urlencode }}{{ cond_qs }}&page=1&page_size={{ pagination.page_size if pagination else 8 }}" class="filter-clear">Clear filters</a>
+            <a href="/search?q={{ query | urlencode }}{{ qs.cond }}&page=1&page_size={{ pagination.page_size if pagination else 8 }}" class="filter-clear">Clear filters</a>
             {% endif %}
         </form>
     </div>
     {% endif %}
 
     {% if products %}
-    <div class="results-container">
+    <div class="results-container result-list">
         {% for product in products %}
         <div class="product-card">
             <div class="product-badges">
@@ -100,16 +102,27 @@
                 <span class="badge custom">{{ cb }}</span>
                 {% endfor %}
             </div>
-            <a href="/product/{{ product.id }}?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ pagination.page if pagination else 1 }}&page_size={{ pagination.page_size if pagination else 8 }}" class="product-card-link" style="text-decoration:none;color:inherit;display:block;">
+            <a href="/product/{{ product.id }}?q={{ query | urlencode }}{{ qs.cond }}{{ qs.filter }}&page={{ pagination.page if pagination else 1 }}&page_size={{ pagination.page_size if pagination else 8 }}" class="product-card-link" style="text-decoration:none;color:inherit;display:block;">
             <div class="product-image">
                 {% if product.image_url %}
-                <img src="{{ product.image_url }}" alt="{{ product.title }}" loading="lazy">
+                {% set card_image_url = product.search_image_url or product.image_url %}
+                {% set fallback_image_url = product.image_url if (product.search_image_url and product.search_image_url != product.image_url) else '' %}
+                <img
+                    src="{{ card_image_url }}"
+                    data-fallback="{{ fallback_image_url }}"
+                    alt="{{ product.title }}"
+                    loading="{{ 'eager' if loop.index <= 4 else 'lazy' }}"
+                    fetchpriority="{{ 'high' if loop.index <= 2 else 'low' }}"
+                    decoding="async"
+                    width="300"
+                    height="300"
+                    onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}"
+                >
                 {% else %}
                 <div class="placeholder-image">📦</div>
                 {% endif %}
             </div>
             <div class="product-info">
-                <span class="product-id" style="font-size:11px;color:#666;font-family:monospace;">ID: {{ product.id }}</span>
                 <h2 class="product-title">{{ product.title }}</h2>
                 <div class="product-rating">
                     {% set rating = product.rating|float %}
@@ -146,7 +159,7 @@
     {% if pagination and pagination.total_pages > 1 %}
     <div class="pagination">
         {% if pagination.has_prev %}
-        <a class="page-btn" href="/search?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ pagination.prev_page }}&page_size={{ pagination.page_size }}">← Prev</a>
+        <a class="page-btn" href="/search?q={{ query | urlencode }}{{ qs.cond }}{{ qs.filter }}&page={{ pagination.prev_page }}&page_size={{ pagination.page_size }}">← Prev</a>
         {% else %}
         <span class="page-btn disabled">← Prev</span>
         {% endif %}
@@ -157,12 +170,12 @@
             {% elif p == pagination.page %}
             <span class="page-number active">{{ p }}</span>
             {% else %}
-            <a class="page-number" href="/search?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ p }}&page_size={{ pagination.page_size }}">{{ p }}</a>
+            <a class="page-number" href="/search?q={{ query | urlencode }}{{ qs.cond }}{{ qs.filter }}&page={{ p }}&page_size={{ pagination.page_size }}">{{ p }}</a>
             {% endif %}
         {% endfor %}
 
         {% if pagination.has_next %}
-        <a class="page-btn" href="/search?q={{ query | urlencode }}{{ cond_qs }}{{ filter_qs }}&page={{ pagination.next_page }}&page_size={{ pagination.page_size }}">Next →</a>
+        <a class="page-btn" href="/search?q={{ query | urlencode }}{{ qs.cond }}{{ qs.filter }}&page={{ pagination.next_page }}&page_size={{ pagination.page_size }}">Next →</a>
         {% else %}
         <span class="page-btn disabled">Next →</span>
         {% endif %}
@@ -171,21 +184,33 @@
     {% elif query %}
     <div class="no-results">
         <p>😢 No products found for "{{ query }}"</p>
-        <p>Try searching for: mousepad, toothpaste, usb cable, etc.</p>
+        <p>Try: smart_watch, bluetooth_speaker, backpack, insulated_cup, athletic_shoes.</p>
     </div>
     {% else %}
-    <div class="welcome">
-        <h1>Welcome to Product Search</h1>
-        <p>Search for products using the search bar above</p>
-        <div class="suggestions">
-            <p>Try searching for:</p>
-            <ul>
-                <li>mousepad</li>
-                <li>toothpaste</li>
-                <li>usb_cable</li>
-                <li>fitness_watch</li>
-                <li>office_lamp</li>
-            </ul>
+    <div class="welcome" style="max-width:980px;margin:36px auto;padding:0 12px;">
+        <h1 style="margin-bottom:10px;">Product Search</h1>
+        <p style="color:#666;margin-bottom:14px;">Pick a category:</p>
+        <div class="welcome-chip-grid">
+            <a href="/search?q=smart_watch&page=1&page_size=8" class="welcome-chip">
+                <span class="welcome-chip-label">Smart Watch</span>
+                <span class="welcome-chip-query">smart_watch</span>
+            </a>
+            <a href="/search?q=bluetooth_speaker&page=1&page_size=8" class="welcome-chip">
+                <span class="welcome-chip-label">Bluetooth Speaker</span>
+                <span class="welcome-chip-query">bluetooth_speaker</span>
+            </a>
+            <a href="/search?q=backpack&page=1&page_size=8" class="welcome-chip">
+                <span class="welcome-chip-label">Backpack</span>
+                <span class="welcome-chip-query">backpack</span>
+            </a>
+            <a href="/search?q=insulated_cup&page=1&page_size=8" class="welcome-chip">
+                <span class="welcome-chip-label">Insulated Cup</span>
+                <span class="welcome-chip-query">insulated_cup</span>
+            </a>
+            <a href="/search?q=athletic_shoes&page=1&page_size=8" class="welcome-chip">
+                <span class="welcome-chip-label">Athletic Shoes</span>
+                <span class="welcome-chip-query">athletic_shoes</span>
+            </a>
         </div>
     </div>
     {% endif %}

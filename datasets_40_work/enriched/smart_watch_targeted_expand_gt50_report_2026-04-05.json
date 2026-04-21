@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-04-05T11:42:22",
+  "backup_dir": "ACES-v2/datasets_40_work/archive_20260405_114222_smart_watch_gt50_expand/enriched",
+  "source_counts": {
+    "datasets_40_work/enriched/smart_watch.json": 191,
+    "datasets_40_work/rebuild_20260405/expand_smart_watch_deep/smart_watch.json": 1200,
+    "datasets_40_work/raw/smart_watch.json": 240,
+    "datasets_expand_stage/smart_watch.json": 240,
+    "datasets_40_work/rebuild_20260405/raw_enriched_all/smart_watch.json": 240
+  },
+  "pool_unique": 1200,
+  "current_count": 191,
+  "accepted_gt50_candidates": 282,
+  "selected_to_add": 49,
+  "final_count": 240,
+  "filters_dropped": {
+    "too_expensive_outlier": 123,
+    "dup_existing": 191,
+    "not_gt_50": 559,
+    "extra_exclude": 45
+  },
+  "assumptions": {
+    "target_total": 240,
+    "new_items_price_constraint": "50 < price <= 160",
+    "new_items_must_have_strong_watch_signal": true,
+    "new_items_exclude_accessory_and_sim_kit": true
+  },
+  "final_price_summary": {
+    "min": 7.99,
+    "max": 134.95,
+    "gt_50_count": 108,
+    "gt_50_ratio": 0.45
+  },
+  "added_price_summary": {
+    "min": 50.99,
+    "max": 79.99,
+    "median": 63.5
+  }
+}

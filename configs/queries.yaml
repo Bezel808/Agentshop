@@ -1,0 +1,58 @@
+# ACES-v2 复杂 Query 设计
+# 用于测试 Agent 的多属性、多约束、场景化选品能力
+
+# 多属性 + 预算
+multi_attribute_budget:
+  - "smart watch under 100 dollars with heart rate monitor and sleep tracking"
+  - "bluetooth speaker portable waterproof under 50 dollars 4 star rating"
+  - "laptop backpack for women waterproof minimalist design under 80"
+
+# 场景化需求
+scenario_based:
+  - "smart watch for running and gym, needs GPS and long battery life"
+  - "bluetooth speaker for outdoor camping, needs waterproof and loud sound"
+  - "insulated water bottle for office, keeps coffee hot 8 hours, easy to clean"
+
+# 多约束组合
+multi_constraint:
+  - "black wireless bluetooth speaker under 50 with at least 4.5 star rating"
+  - "pink smart watch for women, fitness tracker, under 80 dollars"
+  - "men's backpack for travel, laptop compartment, under 100"
+
+# 偏好 + 排除
+preference_exclude:
+  - "smart watch with round face, not square, under 150"
+  - "bluetooth speaker with good bass, no need for waterproof"
+  - "minimalist design insulated tumbler, stainless steel, no plastic"
+
+# 默认推荐（兼顾复杂与可检索）
+default: "smart watch under 100 dollars with heart rate and sleep tracking"
+
+# =============================================================================
+# Verbal vs Visual 差异化 Query 库
+# 设计目标：确保 visual（看图）和 verbal（看文本）选出的商品有很大区别
+# 原理：这些 query 依赖视觉判断（颜色、形状、外观、图案），verbal 只能靠关键词易选错
+# =============================================================================
+
+verbal_vs_visual_divergent:
+  # 颜色准确性：标题可能写 black，但实物有银边/金边；visual 可看图验证
+  - "smart watch that looks PURE BLACK in the product image - solid black only, no silver or gold trim visible"
+  - "bluetooth speaker where the product thumbnail shows a SOLID single color - no RGB lights, no multi-color design"
+  - "all-black backpack - the search result image must show black as the only visible color, no logos or patterns"
+
+  # 形状判断：标题可能写 round，实际可能是方屏；visual 可直接看图
+  - "smart watch with a ROUND dial - the product photo must clearly show a circular screen, not rectangular"
+  - "bluetooth speaker with a cylindrical or rounded shape - avoid boxy/square design, check the product image"
+
+  # 外观/图案：verbal 难以判断「无图案」「简约」；visual 可直接看图
+  - "minimalist smart watch - product image must show clean design, no busy graphics or patterns on the watch face"
+  - "bluetooth speaker with the simplest, cleanest product thumbnail - no busy graphics or brand logos on the body"
+  - "insulated tumbler with a sleek, simple look in the product image - no colorful prints or busy patterns"
+
+  # 主观外观：只有看图才能判断「好看」「高级」
+  - "smart watch that looks the most premium and high-end based on the product image alone, under 150 dollars"
+  - "bluetooth speaker that appears most compact and portable in the search results - small size visible in thumbnail"
+
+  # 综合视觉约束：颜色+形状+风格，verbal 难以同时满足
+  - "black smart watch with round face and minimal design - verify in product image: black, circular, no clutter"
+  - "portable bluetooth speaker that looks solid black and compact in the product photo, under 60 dollars"

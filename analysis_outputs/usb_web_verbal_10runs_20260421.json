@@ -1,0 +1,51 @@
+{
+  "query": "usb_flash_drive price between 7.20 and 12.20",
+  "results": [
+    {
+      "run": 1,
+      "rec": "usb_flash_drive_245"
+    },
+    {
+      "run": 2,
+      "rec": "usb_flash_drive_195"
+    },
+    {
+      "run": 3,
+      "rec": "usb_flash_drive_105"
+    },
+    {
+      "run": 4,
+      "rec": "usb_flash_drive_195"
+    },
+    {
+      "run": 5,
+      "rec": "usb_flash_drive_105"
+    },
+    {
+      "run": 6,
+      "rec": "usb_flash_drive_105"
+    },
+    {
+      "run": 7,
+      "rec": "usb_flash_drive_105"
+    },
+    {
+      "run": 8,
+      "rec": "usb_flash_drive_105"
+    },
+    {
+      "run": 9,
+      "rec": "usb_flash_drive_93"
+    },
+    {
+      "run": 10,
+      "rec": "usb_flash_drive_245"
+    }
+  ],
+  "counts": {
+    "usb_flash_drive_245": 2,
+    "usb_flash_drive_195": 2,
+    "usb_flash_drive_105": 5,
+    "usb_flash_drive_93": 1
+  }
+}

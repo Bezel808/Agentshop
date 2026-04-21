@@ -1,7 +1,7 @@
 """
 ACES Experiment System
 
-Provides experiment orchestration, logging, metrics, and interventions.
+Lightweight package exports with lazy attribute loading.
 """
 
 from aces.experiments.protocols import (
@@ -17,29 +17,8 @@ from aces.experiments.protocols import (
     ExperimentRunner,
 )
 
-from aces.experiments.runner import StandardExperimentRunner
-from aces.experiments.logger import TrajectoryLogger
-
-from aces.experiments.metrics import (
-    DecisionTimeMetric,
-    SelectedProductRankMetric,
-    ToolUsageCountMetric,
-    ModalityUsageMetric,
-    PriceSensitivityMetric,
-    ReasoningQualityMetric,
-)
-
-from aces.experiments.interventions import (
-    ConditionalIntervention,
-    KeywordInjectionIntervention,
-    PriceManipulationIntervention,
-    PositionShuffleIntervention,
-    BadgeManipulationIntervention,
-)
-
 
 __all__ = [
-    # Protocols
     "StepType",
     "TrajectoryStep",
     "Trajectory",
@@ -50,23 +29,57 @@ __all__ = [
     "ExperimentConfig",
     "ExperimentResult",
     "ExperimentRunner",
-    
-    # Implementations
     "StandardExperimentRunner",
     "TrajectoryLogger",
-    
-    # Metrics
     "DecisionTimeMetric",
     "SelectedProductRankMetric",
     "ToolUsageCountMetric",
     "ModalityUsageMetric",
     "PriceSensitivityMetric",
     "ReasoningQualityMetric",
-    
-    # Interventions
+    "InvalidToolCallRateMetric",
+    "RetryRateMetric",
+    "EnvErrorRateMetric",
+    "StepsToSuccessMetric",
     "ConditionalIntervention",
     "KeywordInjectionIntervention",
     "PriceManipulationIntervention",
     "PositionShuffleIntervention",
     "BadgeManipulationIntervention",
 ]
+
+
+def __getattr__(name):
+    if name == "StandardExperimentRunner":
+        from aces.experiments.runner import StandardExperimentRunner
+        return StandardExperimentRunner
+    if name == "TrajectoryLogger":
+        from aces.experiments.logger import TrajectoryLogger
+        return TrajectoryLogger
+
+    if name in {
+        "DecisionTimeMetric",
+        "SelectedProductRankMetric",
+        "ToolUsageCountMetric",
+        "ModalityUsageMetric",
+        "PriceSensitivityMetric",
+        "ReasoningQualityMetric",
+        "InvalidToolCallRateMetric",
+        "RetryRateMetric",
+        "EnvErrorRateMetric",
+        "StepsToSuccessMetric",
+    }:
+        from aces.experiments import metrics as _metrics
+        return getattr(_metrics, name)
+
+    if name in {
+        "ConditionalIntervention",
+        "KeywordInjectionIntervention",
+        "PriceManipulationIntervention",
+        "PositionShuffleIntervention",
+        "BadgeManipulationIntervention",
+    }:
+        from aces.experiments import interventions as _interventions
+        return getattr(_interventions, name)
+
+    raise AttributeError(name)

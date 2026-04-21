@@ -21,10 +21,23 @@ from aces.experiments.protocols import (
     InterventionHook,
     MetricRegistry,
 )
+from aces.experiments.metrics import (
+    DecisionTimeMetric,
+    SelectedProductRankMetric,
+    ToolUsageCountMetric,
+    ModalityUsageMetric,
+    PriceSensitivityMetric,
+    ReasoningQualityMetric,
+    InvalidToolCallRateMetric,
+    RetryRateMetric,
+    EnvErrorRateMetric,
+    StepsToSuccessMetric,
+)
 from aces.core.protocols import Agent, Observation, Action
 from aces.environments.protocols import MarketplaceProvider, PageState
 from aces.config.loader import ConfigLoader
 from aces.environments.router import MarketplaceFactory, MarketplaceAdapter
+from aces.orchestration import AgentOrchestrator, OrchestratorEvent
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +70,20 @@ class StandardExperimentRunner(ExperimentRunner):
         """
         self.metric_registry = metric_registry or MetricRegistry()
         self.intervention_hooks = intervention_hooks or []
+        if metric_registry is None:
+            for calc in [
+                DecisionTimeMetric(),
+                SelectedProductRankMetric(),
+                ToolUsageCountMetric(),
+                ModalityUsageMetric(),
+                PriceSensitivityMetric(),
+                ReasoningQualityMetric(),
+                InvalidToolCallRateMetric(),
+                RetryRateMetric(),
+                EnvErrorRateMetric(),
+                StepsToSuccessMetric(),
+            ]:
+                self.metric_registry.register(calc)
         
         logger.info("Initialized StandardExperimentRunner")
     
@@ -96,9 +123,9 @@ class StandardExperimentRunner(ExperimentRunner):
             json.dump(config.__dict__, f, indent=2, default=str)
         
         # Create agent and environment
-        agent = ConfigLoader.instantiate_agent(config.agent_config)
         marketplace_provider = MarketplaceFactory.create(config.environment_config)
         environment = MarketplaceAdapter(marketplace_provider)
+        agent = ConfigLoader.instantiate_agent(config.agent_config, marketplace_api=environment)
         
         # Run trials
         for trial_num in range(config.num_trials):
@@ -210,82 +237,116 @@ class StandardExperimentRunner(ExperimentRunner):
             # Get initial observation
             observation = self._get_observation(environment, agent)
             
-            # Log initial observation
-            step_count += 1
-            trajectory.add_step(TrajectoryStep(
-                step_number=step_count,
-                timestamp=time.time(),
-                step_type=StepType.OBSERVATION,
-                content=self._serialize_observation(observation),
-                input_modality=observation.modality,
-                environment_state=self._get_env_state(environment),
-                metadata={"initial": True}
-            ))
-            
-            # === MAIN INTERACTION LOOP ===
-            for _ in range(config.max_steps_per_trial):
-                # Agent decides on action
-                action = agent.act(observation)
-                
-                step_count += 1
-                
-                # Log agent's thought process (if available in action)
-                if action.reasoning:
+            def _execute_action(action: Action):
+                from aces.core.protocols import ToolResult
+                result = self._execute_action(environment, action, agent)
+                if result.get("success"):
+                    return ToolResult(
+                        success=True,
+                        data=result.get("data"),
+                        metadata={"tool_name": action.tool_name},
+                    )
+                return ToolResult(
+                    success=False,
+                    data=result.get("data"),
+                    error=result.get("error"),
+                    metadata={"tool_name": action.tool_name},
+                )
+
+            def _stop_condition(action: Action, result, _step: int):
+                if action.tool_name == "add_to_cart" and result.success:
+                    trajectory.success = True
+                    trajectory.final_action = action.parameters
+                    return "add_to_cart_success"
+                return None
+
+            def _on_event(event: OrchestratorEvent):
+                nonlocal step_count, observation
+                if event.event_type == "observation":
+                    obs = event.payload.get("observation")
+                    if obs:
+                        observation = obs
+                        step_count += 1
+                        trajectory.add_step(TrajectoryStep(
+                            step_number=step_count,
+                            timestamp=time.time(),
+                            step_type=StepType.OBSERVATION,
+                            content=self._serialize_observation(obs),
+                            input_modality=obs.modality,
+                            environment_state=self._get_env_state(environment),
+                            metadata={"initial": event.step == 0},
+                        ))
+                elif event.event_type == "action":
+                    action = event.payload.get("action")
+                    if action and action.reasoning:
+                        step_count += 1
+                        trajectory.add_step(TrajectoryStep(
+                            step_number=step_count,
+                            timestamp=time.time(),
+                            step_type=StepType.THOUGHT,
+                            content=action.reasoning,
+                            input_modality=observation.modality if observation else None,
+                            agent_state=self._get_agent_state(agent),
+                        ))
+                    if action:
+                        step_count += 1
+                        trajectory.add_step(TrajectoryStep(
+                            step_number=step_count,
+                            timestamp=time.time(),
+                            step_type=StepType.ACTION,
+                            content={"tool_name": action.tool_name, "parameters": action.parameters},
+                            output_modality="action",
+                            agent_state=self._get_agent_state(agent),
+                        ))
+                elif event.event_type == "tool_result":
+                    result = event.payload.get("result")
+                    if result:
+                        step_count += 1
+                        trajectory.add_step(TrajectoryStep(
+                            step_number=step_count,
+                            timestamp=time.time(),
+                            step_type=StepType.TOOL_RESULT,
+                            content={
+                                "success": result.success,
+                                "data": result.data,
+                                "error": result.error,
+                                "metadata": result.metadata,
+                            },
+                            environment_state=self._get_env_state(environment),
+                        ))
+                elif event.event_type == "termination":
+                    reason = event.payload.get("reason")
+                    trajectory.metadata["termination_reason"] = reason
+                    step_count += 1
                     trajectory.add_step(TrajectoryStep(
                         step_number=step_count,
                         timestamp=time.time(),
-                        step_type=StepType.THOUGHT,
-                        content=action.reasoning,
-                        input_modality=observation.modality,  # What modality triggered this thought
-                        agent_state=self._get_agent_state(agent),
+                        step_type=StepType.TERMINATION,
+                        content={"reason": reason},
+                        metadata={"source": "orchestrator"},
                     ))
-                    step_count += 1
-                
-                # Log action
-                trajectory.add_step(TrajectoryStep(
-                    step_number=step_count,
-                    timestamp=time.time(),
-                    step_type=StepType.ACTION,
-                    content={
-                        "tool_name": action.tool_name,
-                        "parameters": action.parameters,
-                    },
-                    output_modality="action",
-                    agent_state=self._get_agent_state(agent),
-                ))
-                
-                # Execute action in environment
-                tool_result = self._execute_action(environment, action, agent)
-                
-                step_count += 1
-                
-                # Log tool result
-                trajectory.add_step(TrajectoryStep(
-                    step_number=step_count,
-                    timestamp=time.time(),
-                    step_type=StepType.TOOL_RESULT,
-                    content=self._serialize_tool_result(tool_result),
-                    environment_state=self._get_env_state(environment),
-                ))
-                
-                # Check if done (e.g., product added to cart)
-                if action.tool_name == "add_to_cart" and tool_result.get("success"):
-                    trajectory.success = True
-                    trajectory.final_action = action.parameters
-                    break
-                
-                # Get next observation
-                observation = self._get_observation(environment, agent)
-                
-                step_count += 1
-                trajectory.add_step(TrajectoryStep(
-                    step_number=step_count,
-                    timestamp=time.time(),
-                    step_type=StepType.OBSERVATION,
-                    content=self._serialize_observation(observation),
-                    input_modality=observation.modality,
-                    environment_state=self._get_env_state(environment),
-                ))
+
+            orchestrator = AgentOrchestrator(
+                agent=agent,
+                get_initial_observation=lambda: observation,
+                get_next_observation=lambda: self._get_observation(environment, agent),
+                execute_action=_execute_action,
+                should_stop=_stop_condition,
+                on_event=_on_event,
+                max_steps=config.max_steps_per_trial,
+                max_repeated_actions=6,
+                max_errors=8,
+            )
+            orch = orchestrator.run()
+            trajectory.metadata["orchestrator"] = {
+                "success": orch.success,
+                "reason": orch.reason,
+                "steps": orch.steps,
+                "actions_executed": orch.actions_executed,
+                "errors": orch.errors,
+                "repeated_actions": orch.repeated_actions,
+                "action_counts": orch.action_counts,
+            }
             
             trajectory.end_time = time.time()
             

@@ -19,7 +19,7 @@
 | home_and_kitchen | 50 | tools_and_home_improvement | 50 |
 | mousepad | 31 | toys_and_games | 50 |
 
-数据格式可进一步爬评论内容，结构示例见 DATA_SOURCES.md。
+数据格式可进一步爬评论内容，结构示例见 `docs/reference/DATA_SOURCES.md`。
 
 ---
 
@@ -160,17 +160,17 @@ python run_browser_agent.py --llm kimi --perception visual --query "我需要一
 
 ```bash
 # 12 轮：kimi/qwen × visual/verbal × 3 rounds
-./run_batch_experiments.sh
+./scripts/experiments/run_batch_experiments.sh
 
 # 日志在 logs/，结束后自动提取推荐商品汇总
-./extract_recommendations.sh
+./scripts/experiments/extract_recommendations.sh
 ```
 
 ---
 
 ## 相关文档
 
-- [DATA_SOURCES.md](DATA_SOURCES.md) — 数据来源与格式  
-- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — 项目结构  
-- [EXPERIMENT_GUIDE.md](EXPERIMENT_GUIDE.md) — 实验指南  
-- [QUICKSTART.md](QUICKSTART.md) — 快速开始  
+- [docs/reference/DATA_SOURCES.md](docs/reference/DATA_SOURCES.md) — 数据来源与格式  
+- [docs/reference/PROJECT_STRUCTURE.md](docs/reference/PROJECT_STRUCTURE.md) — 项目结构  
+- [docs/guides/EXPERIMENT_GUIDE.md](docs/guides/EXPERIMENT_GUIDE.md) — 实验指南  
+- [docs/guides/QUICKSTART.md](docs/guides/QUICKSTART.md) — 快速开始  

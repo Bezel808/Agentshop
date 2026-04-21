@@ -42,7 +42,25 @@ class KimiBackend(OpenAIBackend):
         openai_messages = []
 
         for msg in messages:
-            if isinstance(msg.content, str):
+            if isinstance(msg.content, dict):
+                ctype = msg.content.get("type")
+                if ctype in {"image", "image_with_prompt"}:
+                    blocks = []
+                    text = msg.content.get("text")
+                    if text:
+                        blocks.append({"type": "text", "text": str(text)})
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": blocks + [
+                            {"type": "image_url", "image_url": {"url": msg.content["image_data"]}}
+                        ],
+                    })
+                else:
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": str(msg.content),
+                    })
+            elif isinstance(msg.content, str):
                 if msg.content.startswith("data:image/"):
                     openai_messages.append({
                         "role": msg.role,

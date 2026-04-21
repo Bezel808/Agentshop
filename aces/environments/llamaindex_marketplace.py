@@ -14,9 +14,17 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import json
+import hashlib
+import re
 
 # LlamaIndex imports
-from llama_index.core import Document, VectorStoreIndex, Settings
+from llama_index.core import (
+    Document,
+    VectorStoreIndex,
+    Settings,
+    StorageContext,
+    load_index_from_storage,
+)
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.retrievers.bm25 import BM25Retriever
 from llama_index.core.retrievers import QueryFusionRetriever
@@ -38,6 +46,12 @@ from aces.environments.product_utils import product_from_dict
 
 
 logger = logging.getLogger(__name__)
+INDEX_SCHEMA_VERSION = "v2_unique_product_ids"
+QUERY_STOPWORDS = {
+    "for", "with", "and", "the", "a", "an", "of", "to", "in",
+    "on", "at", "under", "over", "best", "good", "new", "buy",
+}
+ACCESSORY_HINT_TERMS = {"band", "strap", "chain", "case", "cover", "holder"}
 
 
 class LlamaIndexMarketplace(MarketplaceProvider):
@@ -64,6 +78,7 @@ class LlamaIndexMarketplace(MarketplaceProvider):
         self.vector_retriever: Optional[VectorIndexRetriever] = None
         self.fusion_retriever: Optional[QueryFusionRetriever] = None
         self.reranker: Optional[CrossEncoder] = None
+        self.index_cache_dir: Optional[Path] = None
         
         # Product lookup
         self.products: List[Product] = []
@@ -82,14 +97,18 @@ class LlamaIndexMarketplace(MarketplaceProvider):
         
         Config:
             datasets_dir: ACES 数据集目录
-            embedding_model: 向量模型（默认: all-MiniLM-L6-v2）
+            embedding_model: 向量模型（默认: BAAI/bge-m3）
             reranker_model: 重排序模型（默认: ms-marco-MiniLM-L6-v2）
             use_reranker: 是否使用重排序（默认: True）
+            index_cache_dir: 向量索引缓存根目录（默认: .cache/llamaindex）
+            rebuild_index: 是否强制重建索引（默认: False）
         """
         self.datasets_dir = resolve_datasets_dir(config.get("datasets_dir"))
-        embedding_model = config.get("embedding_model", "all-MiniLM-L6-v2")
+        embedding_model = config.get("embedding_model", "BAAI/bge-m3")
         reranker_model = config.get("reranker_model", "cross-encoder/ms-marco-MiniLM-L6-v2")
         use_reranker = config.get("use_reranker", True)
+        index_cache_dir = config.get("index_cache_dir", ".cache/llamaindex")
+        rebuild_index = bool(config.get("rebuild_index", False))
         
         logger.info(f"Building indices from {self.datasets_dir}...")
         
@@ -102,36 +121,59 @@ class LlamaIndexMarketplace(MarketplaceProvider):
         # 2. 转换为 LlamaIndex Documents
         documents = self._products_to_documents()
         
-        # 3. 配置 LlamaIndex Settings
+        # 3. 索引缓存路径（按数据集快照 + embedding 模型分桶）
+        self.index_cache_dir = self._resolve_index_cache_dir(index_cache_dir)
+        cache_key = self._build_index_cache_key(embedding_model)
+        persist_dir = self.index_cache_dir / cache_key
+        persist_dir.mkdir(parents=True, exist_ok=True)
+        vector_store_exists = (
+            (persist_dir / "vector_store.json").exists()
+            or (persist_dir / "default__vector_store.json").exists()
+        )
+        can_load_cache = (
+            not rebuild_index
+            and (persist_dir / "docstore.json").exists()
+            and (persist_dir / "index_store.json").exists()
+            and vector_store_exists
+        )
+        
+        # 4. 配置 LlamaIndex Settings
         Settings.embed_model = HuggingFaceEmbedding(model_name=embedding_model)
         Settings.chunk_size = 512
         Settings.chunk_overlap = 50
         
-        # 4. 创建向量索引
-        logger.info("Building vector index...")
-        self.index = VectorStoreIndex.from_documents(
-            documents,
-            show_progress=True,
-        )
+        # 5. 创建或加载向量索引
+        if can_load_cache:
+            logger.info(f"Loading vector index from cache: {persist_dir}")
+            storage_context = StorageContext.from_defaults(persist_dir=str(persist_dir))
+            self.index = load_index_from_storage(storage_context)
+        else:
+            logger.info(f"Building vector index (cache miss): {persist_dir}")
+            self.index = VectorStoreIndex.from_documents(
+                documents,
+                show_progress=True,
+            )
+            self.index.storage_context.persist(persist_dir=str(persist_dir))
+            logger.info(f"Persisted vector index to: {persist_dir}")
         
-        # 5. 创建 BM25 检索器
+        # 6. 创建 BM25 检索器
         logger.info("Building BM25 retriever...")
         self.bm25_retriever = BM25Retriever.from_defaults(
             index=self.index,
             similarity_top_k=50,  # 召回 50 个
         )
         
-        # 6. 创建向量检索器
+        # 7. 创建向量检索器
         logger.info("Building vector retriever...")
         self.vector_retriever = VectorIndexRetriever(
             index=self.index,
             similarity_top_k=50,  # 召回 50 个
         )
         
-        # 7. 混合检索使用手动 RRF（避免 LLM 依赖）
+        # 8. 混合检索使用手动 RRF（避免 LLM 依赖）
         logger.info("Hybrid retrieval ready (manual RRF)...")
         
-        # 8. 加载重排序模型
+        # 9. 加载重排序模型
         if use_reranker:
             logger.info(f"Loading reranker: {reranker_model}...")
             self.reranker = CrossEncoder(reranker_model)
@@ -140,6 +182,7 @@ class LlamaIndexMarketplace(MarketplaceProvider):
             f"✓ LlamaIndex marketplace initialized:\n"
             f"  Products: {len(self.products)}\n"
             f"  Embedding: {embedding_model}\n"
+            f"  Index Cache: {persist_dir}\n"
             f"  Reranker: {reranker_model if use_reranker else 'None'}"
         )
     
@@ -210,6 +253,13 @@ class LlamaIndexMarketplace(MarketplaceProvider):
             ]
         else:
             sorted_products = candidate_products
+
+        # Stage 4.5: lexical relevance re-rank/gate to suppress obvious mismatches
+        sorted_products = self._re_rank_by_query_signal(
+            products=sorted_products,
+            query=query,
+            min_keep=max(limit, 8),
+        )
 
         # Apply price/rating filter
         sorted_products = self._apply_price_rating_filter(
@@ -304,37 +354,70 @@ class LlamaIndexMarketplace(MarketplaceProvider):
     # ========================================================================
     # Private Helper Methods
     # ========================================================================
+
+    def _load_products_data_from_file(
+        self, json_file: Path, *, log_skip: bool = True
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Load one dataset file and validate it's list[dict]."""
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            if log_skip:
+                logger.error(f"Failed to load {json_file}: {e}")
+            return None
+
+        if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+            if log_skip:
+                logger.warning(f"Skipping non-product dataset file: {json_file.name}")
+            return None
+        return data
     
     def _load_all_products(self) -> List[Product]:
         """从所有 JSON 文件加载商品。"""
         all_products = []
+        id_counts: Dict[str, int] = {}
+        duplicate_count = 0
         
         if not self.datasets_dir.exists():
             logger.warning(f"Datasets directory not found: {self.datasets_dir}")
             return []
         
         # 遍历所有 JSON 文件
-        for json_file in self.datasets_dir.glob("*.json"):
-            try:
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    products_data = json.load(f)
-                
-                category = json_file.stem  # 文件名作为类别
-                
-                for idx, data in enumerate(products_data):
-                    data_with_category = {"category": category, **data}
-                    product = product_from_dict(
-                        data_with_category,
-                        index=idx,
-                        source="llamaindex",
-                        category=category,
-                    )
-                    all_products.append(product)
-            
-            except Exception as e:
-                logger.error(f"Failed to load {json_file}: {e}")
+        for json_file in sorted(self.datasets_dir.glob("*.json")):
+            products_data = self._load_products_data_from_file(json_file, log_skip=True)
+            if products_data is None:
                 continue
-        
+
+            category = json_file.stem  # 文件名作为类别
+
+            for idx, data in enumerate(products_data):
+                data_with_category = {"category": category, **data}
+                product = product_from_dict(
+                    data_with_category,
+                    index=idx,
+                    source="llamaindex",
+                    category=category,
+                )
+                base_id = str(product.id)
+                seen = id_counts.get(base_id, 0)
+                id_counts[base_id] = seen + 1
+                if seen > 0:
+                    duplicate_count += 1
+                    unique_id = f"{base_id}__dup{seen+1}"
+                    raw = dict(product.raw_data or {})
+                    raw["original_id"] = base_id
+                    raw["dedup_id"] = unique_id
+                    raw["dedup_rank"] = seen + 1
+                    product.id = unique_id
+                    product.raw_data = raw
+                all_products.append(product)
+
+        if duplicate_count:
+            logger.warning(
+                "Detected %d duplicate product IDs; auto-renamed to unique IDs during load.",
+                duplicate_count,
+            )
         return all_products
     
     def _products_to_documents(self) -> List[Document]:
@@ -409,3 +492,123 @@ class LlamaIndexMarketplace(MarketplaceProvider):
             return sorted(products, key=lambda p: p.rating or 0, reverse=True)
         else:
             return products
+
+    def _resolve_index_cache_dir(self, raw_dir: str) -> Path:
+        """Resolve index cache root path."""
+        p = Path(raw_dir)
+        if not p.is_absolute():
+            # project root: .../ACES-v2
+            p = Path(__file__).resolve().parents[2] / p
+        return p
+
+    def _build_index_cache_key(self, embedding_model: str) -> str:
+        """Build stable cache key from dataset file signatures + embedding model."""
+        entries: List[str] = [f"embedding={embedding_model}", f"schema={INDEX_SCHEMA_VERSION}"]
+        for fp in sorted(self.datasets_dir.glob("*.json")):
+            # Only product datasets should affect index cache invalidation.
+            if self._load_products_data_from_file(fp, log_skip=False) is None:
+                continue
+            try:
+                st = fp.stat()
+                entries.append(f"{fp.name}:{st.st_size}:{st.st_mtime_ns}")
+            except OSError:
+                entries.append(f"{fp.name}:missing")
+        digest = hashlib.sha1("|".join(entries).encode("utf-8")).hexdigest()[:16]
+        return f"idx_{digest}"
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+    @staticmethod
+    def _compact_text(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
+
+    def _extract_query_terms(self, query: str) -> List[str]:
+        normalized = self._normalize_text(query)
+        terms = [t for t in normalized.split() if len(t) >= 2 and t not in QUERY_STOPWORDS]
+        # 保序去重
+        return list(dict.fromkeys(terms))
+
+    @staticmethod
+    def _term_match(term: str, normalized_text: str, compact_text: str) -> bool:
+        # Match both spaced and compact form, e.g. smart watch <-> smartwatch.
+        if f" {term} " in f" {normalized_text} ":
+            return True
+        return term in compact_text
+
+    def _re_rank_by_query_signal(
+        self,
+        products: List[Product],
+        query: str,
+        min_keep: int = 10,
+    ) -> List[Product]:
+        """
+        Re-rank by lexical intent and apply light gating for single-word queries.
+
+        Why:
+        - Semantic retrievers sometimes return topical but wrong-category items
+          (e.g., query "watch" returning "fan").
+        - For short queries we prefer title/category hit to keep precision high.
+        """
+        if not products:
+            return products
+
+        terms = self._extract_query_terms(query)
+        if not terms:
+            return products
+
+        phrase = self._normalize_text(query)
+        phrase_compact = self._compact_text(query)
+        single_strong_term = len(terms) == 1 and len(terms[0]) >= 4
+
+        scored: List[tuple[float, int, Product, bool]] = []
+        for rank, p in enumerate(products):
+            title = p.title or ""
+            desc = p.description or ""
+            category = str((p.raw_data or {}).get("category", ""))
+
+            title_norm = self._normalize_text(title)
+            title_compact = self._compact_text(title)
+            desc_norm = self._normalize_text(desc)
+            desc_compact = self._compact_text(desc)
+            cat_norm = self._normalize_text(category)
+            cat_compact = self._compact_text(category)
+
+            title_hits = sum(1 for t in terms if self._term_match(t, title_norm, title_compact))
+            desc_hits = sum(1 for t in terms if self._term_match(t, desc_norm, desc_compact))
+            category_hits = sum(1 for t in terms if self._term_match(t, cat_norm, cat_compact))
+
+            phrase_in_title = bool(phrase and phrase in title_norm) or bool(phrase_compact and phrase_compact in title_compact)
+            phrase_in_desc = bool(phrase and phrase in desc_norm) or bool(phrase_compact and phrase_compact in desc_compact)
+
+            core_match = title_hits > 0 or category_hits > 0
+            score = 0.0
+            score += 100.0 if phrase_in_title else 0.0
+            score += 35.0 * title_hits
+            score += 12.0 * category_hits
+            score += 8.0 * desc_hits
+            score += 6.0 if phrase_in_desc else 0.0
+            score += 20.0 if core_match else 0.0
+
+            # For single-word intent like "watch", de-prioritize accessory items.
+            # Users usually expect the core product first, not strap/chain/case.
+            if single_strong_term and title_norm:
+                accessory_hit = any(
+                    f" {acc} " in f" {title_norm} " for acc in ACCESSORY_HINT_TERMS
+                )
+                if accessory_hit:
+                    score -= 28.0
+
+            score -= rank * 0.03
+
+            scored.append((score, rank, p, core_match))
+
+        # For short single-term queries, suppress non-core matches if we still have enough candidates.
+        if single_strong_term:
+            core = [row for row in scored if row[3]]
+            if len(core) >= min_keep:
+                scored = core
+
+        scored.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+        return [p for _, _, p, _ in scored]

@@ -39,7 +39,28 @@ class QwenBackend(OpenAIBackend):
         openai_messages = []
         
         for msg in messages:
-            if isinstance(msg.content, str):
+            if isinstance(msg.content, dict):
+                ctype = msg.content.get("type")
+                if ctype in {"image", "image_with_prompt"}:
+                    blocks = []
+                    text = msg.content.get("text")
+                    if text:
+                        blocks.append({"type": "text", "text": str(text)})
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": blocks + [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": msg.content["image_data"]},
+                            }
+                        ],
+                    })
+                else:
+                    openai_messages.append({
+                        "role": msg.role,
+                        "content": str(msg.content),
+                    })
+            elif isinstance(msg.content, str):
                 # 检查是否是 data URL（图像）
                 if msg.content.startswith("data:image/"):
                     # 这是图像 data URL，转换为多模态格式
@@ -59,7 +80,7 @@ class QwenBackend(OpenAIBackend):
                         "content": msg.content
                     })
             else:
-                # 其他类型，使用父类处理
+                # 其他类型
                 openai_messages.append({
                     "role": msg.role,
                     "content": str(msg.content)

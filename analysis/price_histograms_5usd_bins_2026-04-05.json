@@ -1,0 +1,91 @@
+{
+  "bin_width_usd": 5,
+  "global_price_range": [
+    5,
+    505
+  ],
+  "categories": [
+    {
+      "category": "athletic_shoes",
+      "total_items": 200,
+      "priced_items": 200,
+      "missing_price_items": 0,
+      "min": 20.0,
+      "median": 54.980000000000004,
+      "max": 160.39,
+      "top_bin_5usd": [
+        45,
+        50,
+        25
+      ]
+    },
+    {
+      "category": "backpack",
+      "total_items": 84,
+      "priced_items": 84,
+      "missing_price_items": 0,
+      "min": 7.99,
+      "median": 31.74,
+      "max": 266.93,
+      "top_bin_5usd": [
+        25,
+        30,
+        14
+      ]
+    },
+    {
+      "category": "bluetooth_speaker",
+      "total_items": 133,
+      "priced_items": 133,
+      "missing_price_items": 0,
+      "min": 6.57,
+      "median": 39.99,
+      "max": 499.0,
+      "top_bin_5usd": [
+        35,
+        40,
+        21
+      ]
+    },
+    {
+      "category": "insulated_cup",
+      "total_items": 187,
+      "priced_items": 187,
+      "missing_price_items": 0,
+      "min": 11.99,
+      "median": 16.86,
+      "max": 21.99,
+      "top_bin_5usd": [
+        15,
+        20,
+        96
+      ]
+    },
+    {
+      "category": "smart_watch",
+      "total_items": 191,
+      "priced_items": 191,
+      "missing_price_items": 0,
+      "min": 7.99,
+      "median": 39.99,
+      "max": 134.95,
+      "top_bin_5usd": [
+        25,
+        30,
+        31
+      ]
+    }
+  ],
+  "overall": {
+    "priced_items": 795,
+    "min": 6.57,
+    "median": 35.99,
+    "max": 499.0,
+    "top_bin_5usd": [
+      15,
+      20,
+      139
+    ]
+  },
+  "image": "analysis/price_histograms_5usd_bins_2026-04-05.png"
+}

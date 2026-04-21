@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACES 数据清洗后台</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            margin-bottom: 14px;
+        }
+        .title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .muted {
+            color: #6b7280;
+            font-size: 13px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        select, input {
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 14px;
+            background: #fff;
+        }
+        input[type="text"] { min-width: 280px; }
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-secondary { background: #e5e7eb; color: #111827; }
+        .btn-primary:disabled, .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+        a.btn-secondary {
+            display: inline-block;
+            text-decoration: none;
+            line-height: 1.2;
+        }
+        .row-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 13px;
+            min-height: 18px;
+        }
+        .status.ok { color: #059669; }
+        .status.err { color: #dc2626; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+            padding: 8px;
+            vertical-align: top;
+            font-size: 13px;
+        }
+        th {
+            background: #f9fafb;
+            position: sticky;
+            top: 0;
+        }
+        .img {
+            width: 58px;
+            height: 58px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+        }
+        .title-cell { max-width: 500px; }
+        .desc {
+            color: #6b7280;
+            font-size: 12px;
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+        .pager {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="title">商品库人工清洗</div>
+            <div class="muted">按类目检索后勾选删除。适合删掉“手表链被混入手表类目”这种误入样本。</div>
+        </div>
+
+        <div class="card">
+            <div class="controls">
+                <label>类目：
+                    <select id="category"></select>
+                </label>
+                <label>关键词：
+                    <input id="keyword" type="text" placeholder="例如：band / strap / women / refurbished">
+                </label>
+                <button id="searchBtn" class="btn-primary">查询</button>
+                <button id="selectAllBtn" class="btn-secondary">全选当前页</button>
+                <button id="clearBtn" class="btn-secondary">清空选择</button>
+                <button id="deleteBtn" class="btn-danger">删除选中</button>
+            </div>
+            <div id="status" class="status"></div>
+            <div id="summary" class="muted"></div>
+        </div>
+
+        <div class="card" style="max-height: 68vh; overflow: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:34px;"><input id="checkHeader" type="checkbox"></th>
+                        <th style="width:70px;">图片</th>
+                        <th>商品</th>
+                        <th style="width:120px;">图片/评论</th>
+                        <th style="width:100px;">价格</th>
+                        <th style="width:80px;">评分</th>
+                        <th style="width:92px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <div class="pager">
+                <button id="prevBtn" class="btn-secondary">上一页</button>
+                <span id="pagerText" class="muted">-</span>
+                <button id="nextBtn" class="btn-secondary">下一页</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = (new URLSearchParams(window.location.search).get('token') || '').trim();
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentCategory = '';
+        let currentData = [];
+        const selectedIndices = new Set();
+
+        function withToken(url) {
+            if (!token) return url;
+            const sep = url.includes('?') ? '&' : '?';
+            return `${url}${sep}token=${encodeURIComponent(token)}`;
+        }
+
+        function authHeaders(base = {}) {
+            if (!token) return base;
+            return { ...base, 'X-ACES-Token': token };
+        }
+
+        function setStatus(text, ok = true) {
+            const el = document.getElementById('status');
+            el.textContent = text || '';
+            el.className = `status ${ok ? 'ok' : 'err'}`;
+        }
+
+        async function loadCategories() {
+            const res = await fetch(withToken('/api/admin/categories'), { headers: authHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '加载类目失败');
+            const sel = document.getElementById('category');
+            sel.innerHTML = '';
+            for (const c of data.categories || []) {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = `${c.name} (${c.count})`;
+                sel.appendChild(opt);
+            }
+            currentCategory = sel.value || '';
+        }
+
+        async function loadProducts(page = 1) {
+            currentCategory = document.getElementById('category').value;
+            const q = (document.getElementById('keyword').value || '').trim();
+            if (!currentCategory) return;
+            const url = withToken(`/api/admin/products?category=${encodeURIComponent(currentCategory)}&q=${encodeURIComponent(q)}&page=${page}&page_size=30`);
+            const res = await fetch(url, { headers: authHeaders() });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '加载商品失败');
+            currentData = data.products || [];
+            currentPage = data.page || 1;
+            totalPages = data.total_pages || 1;
+            renderRows();
+            document.getElementById('summary').textContent = `共 ${data.total || 0} 条，当前第 ${currentPage}/${totalPages} 页`;
+            document.getElementById('pagerText').textContent = `第 ${currentPage}/${totalPages} 页`;
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        function renderRows() {
+            const tbody = document.getElementById('rows');
+            tbody.innerHTML = '';
+            for (const item of currentData) {
+                const tr = document.createElement('tr');
+                const checked = selectedIndices.has(item.index) ? 'checked' : '';
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="row-check" data-index="${item.index}" ${checked}></td>
+                    <td>${item.image_url ? `<img class="img" src="${item.image_url}" alt="">` : ''}</td>
+                    <td class="title-cell">
+                        <div><strong>${item.title || ''}</strong></div>
+                        <div class="muted">sku: ${item.sku || '-'} | index: ${item.index}</div>
+                        <div class="desc">${item.description || ''}</div>
+                    </td>
+                    <td>
+                        <div class="muted">图片: <strong>${item.image_count ?? 0}</strong></div>
+                        <div class="muted">评论: <strong>${item.review_count ?? 0}</strong></div>
+                    </td>
+                    <td>${item.price == null ? '-' : `$${item.price}`}</td>
+                    <td>${item.rating == null ? '-' : item.rating}</td>
+                    <td>
+                        <div class="row-actions">
+                            ${
+                                item.detail_url
+                                    ? `<a class="btn-secondary" href="${item.detail_url}" target="_blank" rel="noopener">详情</a>`
+                                    : `<button class="btn-secondary" disabled title="该条目缺少 product_id，无法跳转详情">详情</button>`
+                            }
+                            <button class="btn-danger btn-one" data-index="${item.index}">删除</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            for (const cb of document.querySelectorAll('.row-check')) {
+                cb.addEventListener('change', (e) => {
+                    const idx = Number(e.target.dataset.index);
+                    if (e.target.checked) selectedIndices.add(idx);
+                    else selectedIndices.delete(idx);
+                });
+            }
+            for (const btn of document.querySelectorAll('.btn-one')) {
+                btn.addEventListener('click', async (e) => {
+                    const idx = Number(e.target.dataset.index);
+                    await deleteIndices([idx]);
+                });
+            }
+            syncHeaderCheck();
+        }
+
+        function syncHeaderCheck() {
+            const rows = [...document.querySelectorAll('.row-check')];
+            const allChecked = rows.length > 0 && rows.every(x => x.checked);
+            document.getElementById('checkHeader').checked = allChecked;
+        }
+
+        async function deleteIndices(indices) {
+            if (!indices.length) return;
+            const ok = window.confirm(`确认删除 ${indices.length} 条商品吗？此操作会直接修改 JSON 文件。`);
+            if (!ok) return;
+            const payload = { category: currentCategory, indices };
+            const res = await fetch(withToken('/api/admin/delete'), {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || '删除失败');
+            for (const i of indices) selectedIndices.delete(i);
+            setStatus(`已删除 ${data.deleted_count} 条，${data.before} -> ${data.after}`);
+            await loadCategories();
+            await loadProducts(Math.min(currentPage, totalPages));
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', async () => {
+            try {
+                setStatus('加载中...');
+                await loadProducts(1);
+                setStatus('加载完成');
+            } catch (e) {
+                setStatus(e.message || '加载失败', false);
+            }
+        });
+
+        document.getElementById('deleteBtn').addEventListener('click', async () => {
+            try {
+                await deleteIndices([...selectedIndices]);
+            } catch (e) {
+                setStatus(e.message || '删除失败', false);
+            }
+        });
+
+        document.getElementById('prevBtn').addEventListener('click', async () => {
+            if (currentPage <= 1) return;
+            try { await loadProducts(currentPage - 1); } catch (e) { setStatus(e.message, false); }
+        });
+        document.getElementById('nextBtn').addEventListener('click', async () => {
+            if (currentPage >= totalPages) return;
+            try { await loadProducts(currentPage + 1); } catch (e) { setStatus(e.message, false); }
+        });
+
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            for (const cb of document.querySelectorAll('.row-check')) {
+                cb.checked = true;
+                selectedIndices.add(Number(cb.dataset.index));
+            }
+            syncHeaderCheck();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            selectedIndices.clear();
+            for (const cb of document.querySelectorAll('.row-check')) cb.checked = false;
+            syncHeaderCheck();
+        });
+
+        document.getElementById('checkHeader').addEventListener('change', (e) => {
+            const checked = e.target.checked;
+            for (const cb of document.querySelectorAll('.row-check')) {
+                cb.checked = checked;
+                const idx = Number(cb.dataset.index);
+                if (checked) selectedIndices.add(idx);
+                else selectedIndices.delete(idx);
+            }
+        });
+
+        document.getElementById('category').addEventListener('change', async () => {
+            selectedIndices.clear();
+            try { await loadProducts(1); } catch (e) { setStatus(e.message, false); }
+        });
+
+        document.getElementById('keyword').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('searchBtn').click();
+        });
+
+        (async () => {
+            try {
+                if (!token) {
+                    setStatus('缺少 token，请使用带 ?token=... 的链接访问', false);
+                    return;
+                }
+                await loadCategories();
+                await loadProducts(1);
+                setStatus('就绪');
+            } catch (e) {
+                setStatus(e.message || '初始化失败', false);
+            }
+        })();
+    </script>
+</body>
+</html>

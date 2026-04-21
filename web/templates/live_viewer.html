@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ACES-v2 实时浏览器查看器</title>
+    <title>ACES-v2 Live Browser Viewer</title>
     <style>
         * {
             margin: 0;
@@ -71,8 +71,16 @@
             position: relative;
             overflow: hidden;
         }
-        
-        .browser-screen img {
+
+        .browser-stream {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .browser-stream img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
@@ -189,56 +197,352 @@
             align-items: center;
             gap: 6px;
         }
+
+        .query-control {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #444;
+        }
+
+        .query-input {
+            width: 100%;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .query-options {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .query-options label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .run-btn {
+            width: 100%;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .run-btn:hover {
+            opacity: 0.9;
+        }
+
+        .run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stop-btn {
+            width: 100%;
+            margin-top: 8px;
+            padding: 10px 16px;
+            background: #7a1f1f;
+            border: 1px solid #a33;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .stop-btn:hover {
+            opacity: 0.9;
+        }
+
+        .stop-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .run-status {
+            margin-top: 8px;
+            font-size: 12px;
+            min-height: 18px;
+        }
+
+        .run-status.success { color: #4caf50; }
+        .run-status.error { color: #f44336; }
+
+        .recommend-panel {
+            margin: 0 15px 15px;
+            padding: 12px;
+            border: 1px solid #3f4a66;
+            border-radius: 8px;
+            background: #1f2533;
+            display: none;
+        }
+
+        .recommend-stage {
+            position: absolute;
+            inset: 0;
+            display: none;
+            overflow-y: auto;
+            background: #111827;
+            padding: 20px;
+            z-index: 5;
+        }
+
+        .recommend-stage .recommend-panel {
+            display: block;
+            margin: 0;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+
+        .recommend-stage .recommend-title {
+            font-size: 22px;
+            margin-bottom: 14px;
+        }
+
+        .recommend-stage .recommend-meta {
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .recommend-title {
+            font-size: 13px;
+            color: #a9b8ff;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .recommend-meta {
+            font-size: 12px;
+            color: #d9d9d9;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .recommend-reason {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px solid #3b3b3b;
+            border-radius: 6px;
+            background: #171717;
+            white-space: normal;
+            line-height: 1.5;
+            color: #e5e7eb;
+        }
+
+        .recommend-link {
+            display: inline-block;
+            font-size: 12px;
+            color: #fff;
+            text-decoration: none;
+            background: #3b82f6;
+            padding: 7px 12px;
+            border-radius: 6px;
+        }
+
+        .recommend-link:hover {
+            opacity: 0.9;
+        }
+
+        .recommend-cards {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .recommend-card {
+            background: #212121;
+            border: 1px solid #3b3b3b;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .recommend-card-media {
+            margin-bottom: 8px;
+        }
+
+        .recommend-card-image {
+            width: 100%;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 6px;
+            background: #171717;
+            border: 1px solid #333;
+            display: block;
+        }
+
+        .recommend-card-image--empty {
+            width: 100%;
+            height: 120px;
+            border-radius: 6px;
+            border: 1px dashed #3a3a3a;
+            background: #171717;
+            color: #8f8f8f;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .recommend-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .recommend-rank {
+            font-size: 11px;
+            color: #fff;
+            background: #3b82f6;
+            border-radius: 999px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        .recommend-card-title {
+            font-size: 12px;
+            line-height: 1.4;
+            color: #f5f5f5;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .recommend-card-meta {
+            font-size: 11px;
+            color: #c7c7c7;
+            margin-bottom: 6px;
+        }
+
+        .recommend-card-link {
+            display: inline-block;
+            font-size: 11px;
+            color: #fff;
+            text-decoration: none;
+            background: #2563eb;
+            padding: 5px 9px;
+            border-radius: 6px;
+        }
+
+        .recommend-card-link:hover {
+            opacity: 0.9;
+        }
+
+        @media (max-width: 1280px) {
+            .recommend-cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 900px) {
+            .recommend-cards {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="main-container">
-        <!-- 左侧：浏览器视图 -->
+        <!-- Left: Browser View -->
         <div class="browser-view">
             <div class="browser-header">
                 <div class="status-indicator"></div>
-                <input type="text" class="url-bar" id="current-url" readonly value="等待连接...">
+                <input type="text" class="url-bar" id="current-url" readonly value="Waiting for connection...">
             </div>
             
-            <div class="browser-screen" id="browser-screen">
-                <div class="placeholder">
-                    等待 Agent 开始操作浏览器...<br>
-                    <small style="color: #888; margin-top: 10px; display: block;">
-                        Agent 会在服务器上运行，实时截图传输到这里显示
-                    </small>
+            <div class="browser-screen">
+                <div class="browser-stream" id="browser-screen">
+                    <div class="placeholder">
+                        Waiting for the Agent to start browsing...<br>
+                        <small style="color: #888; margin-top: 10px; display: block;">
+                            The Agent runs on the server and streams live screenshots here.
+                        </small>
+                    </div>
                 </div>
-                
+
+                <div class="recommend-stage" id="recommend-stage">
+                    <div class="recommend-panel" id="recommend-panel">
+                        <div class="recommend-title" id="recommend-title">Recommendations</div>
+                        <div class="recommend-meta" id="recommend-meta">Waiting for recommendation...</div>
+                        <div id="recommend-cards" class="recommend-cards"></div>
+                    </div>
+                </div>
+
                 <div class="connection-status" id="connection-status">
-                    🔴 未连接
+                    🔴 Disconnected
                 </div>
             </div>
         </div>
         
-        <!-- 右侧：活动日志 -->
+        <!-- Right: Activity Log -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-title">🎯 Agent 活动日志</div>
+                <div class="query-control">
+                    <input type="text" id="query-input" class="query-input" placeholder="Enter your shopping request, e.g. smart watch under 100 dollars" maxlength="500">
+                    <div class="query-options">
+                        <label><input type="radio" name="perception" value="visual" checked> Visual (image-first)</label>
+                        <label><input type="radio" name="perception" value="verbal"> Verbal (text-first)</label>
+                    </div>
+                    <button type="button" id="run-btn" class="run-btn">▶ Run Agent</button>
+                    <button type="button" id="stop-btn" class="stop-btn">■ Stop Agent</button>
+                    <div id="run-status" class="run-status"></div>
+                </div>
+                <div class="sidebar-title">🎯 Agent Activity Log</div>
             </div>
             
             <div class="activity-log" id="activity-log">
                 <div class="log-item">
-                    <div class="log-time">等待中...</div>
-                    <div class="log-content">等待 Agent 开始运行</div>
+                    <div class="log-time">Waiting...</div>
+                    <div class="log-content">Waiting for the Agent to start</div>
                 </div>
             </div>
-            
+
             <div class="metrics">
                 <div class="metric-row">
-                    <span class="metric-label">运行时间</span>
+                    <span class="metric-label">Run Time</span>
                     <span class="metric-value" id="metric-time">0s</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">操作次数</span>
+                    <span class="metric-label">Actions</span>
                     <span class="metric-value" id="metric-actions">0</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">当前步骤</span>
-                    <span class="metric-value" id="metric-step">等待</span>
+                    <span class="metric-label">Current Step</span>
+                    <span class="metric-value" id="metric-step">Waiting</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Run Reason</span>
+                    <span class="metric-value" id="metric-run_reason">—</span>
+                </div>
+                <div class="metric-row" style="flex-direction:column;align-items:stretch;">
+                    <span class="metric-label">Decision Path</span>
+                    <span class="metric-value" id="metric-decision-path" style="word-break:break-all;font-size:11px;">—</span>
                 </div>
             </div>
         </div>
@@ -248,16 +552,36 @@
         let ws = null;
         let startTime = null;
         let actionCount = 0;
+        let runStarted = false;
+        let gotRecommendation = false;
+        let lastRunReason = '';
+        const viewerToken = (new URLSearchParams(window.location.search).get('token') || '').trim();
+
+        function withToken(path) {
+            if (!viewerToken) return path;
+            const separator = path.includes('?') ? '&' : '?';
+            return `${path}${separator}token=${encodeURIComponent(viewerToken)}`;
+        }
+
+        function buildAuthHeaders(baseHeaders = {}) {
+            if (!viewerToken) return baseHeaders;
+            return { ...baseHeaders, 'X-ACES-Token': viewerToken };
+        }
         
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/viewer`;
+            const tokenSuffix = viewerToken ? `?token=${encodeURIComponent(viewerToken)}` : '';
+            const wsUrl = `${protocol}//${window.location.host}/ws/viewer${tokenSuffix}`;
             
             ws = new WebSocket(wsUrl);
             
             ws.onopen = () => {
-                console.log('WebSocket 已连接');
-                updateConnectionStatus('🟢 已连接');
+                console.log('WebSocket connected');
+                updateConnectionStatus('🟢 Connected');
+                const currentUrl = document.getElementById('current-url');
+                if (currentUrl && (currentUrl.value || '').includes('Waiting for connection')) {
+                    currentUrl.value = 'Connected. Waiting for Agent events...';
+                }
             };
             
             ws.onmessage = (event) => {
@@ -266,8 +590,12 @@
             };
             
             ws.onclose = () => {
-                console.log('WebSocket 断开，3秒后重连');
-                updateConnectionStatus('🔴 断开连接');
+                console.log('WebSocket closed, retrying in 3s');
+                updateConnectionStatus('🔴 Disconnected');
+                const currentUrl = document.getElementById('current-url');
+                if (currentUrl) {
+                    currentUrl.value = 'Disconnected. Reconnecting...';
+                }
                 setTimeout(connectWebSocket, 3000);
             };
         }
@@ -283,7 +611,113 @@
                 case 'metric':
                     updateMetric(data.name, data.value);
                     break;
+                case 'decision_path':
+                    const el = document.getElementById('metric-decision-path');
+                    if (el && data.summary) el.textContent = data.summary;
+                    if (data.step) addLog('action', `[Path] ${data.step}`);
+                    break;
+                case 'recommend':
+                    renderRecommendation(data);
+                    break;
             }
+        }
+
+        function renderRecommendation(data) {
+            const stage = document.getElementById('recommend-stage');
+            const panel = document.getElementById('recommend-panel');
+            const title = document.getElementById('recommend-title');
+            const meta = document.getElementById('recommend-meta');
+            const cards = document.getElementById('recommend-cards');
+            if (!stage || !panel || !meta || !cards) return;
+            gotRecommendation = true;
+
+            const list = Array.isArray(data.recommendations) && data.recommendations.length
+                ? data.recommendations
+                : [{
+                    rank: 1,
+                    product_id: data.product_id || 'unknown',
+                    product_title: data.product_title || data.product_id || 'unknown',
+                    product_url: data.product_url || `/product/${encodeURIComponent(data.product_id || 'unknown')}`,
+                    price: null,
+                    rating: null,
+                    rating_count: null,
+                    image_url: ''
+                }];
+
+            const top1 = list[0];
+            if (title) {
+                title.textContent = list.length === 1
+                    ? 'Top-1 Recommendation'
+                    : `Top-${list.length} Recommendations`;
+            }
+            const reasonText = String(data.reason || '').trim();
+            const primaryLine = `Primary: ${escapeHtml(top1.product_title || top1.product_id || 'unknown')}`;
+            if (reasonText) {
+                meta.innerHTML = `${primaryLine}<div class="recommend-reason">${escapeHtml(reasonText).replace(/\n/g, '<br>')}</div>`;
+            } else {
+                meta.innerHTML = primaryLine;
+            }
+            cards.innerHTML = list.map((item, idx) => {
+                const rank = Number(item.rank || (idx + 1));
+                const pid = String(item.product_id || 'unknown');
+                const title = String(item.product_title || pid);
+                const url = String(item.product_url || `/product/${encodeURIComponent(pid)}`);
+                const imageUrl = String(item.image_url || '');
+                const hasPrice = item.price !== null && item.price !== undefined && item.price !== '';
+                const hasRating = item.rating !== null && item.rating !== undefined && item.rating !== '';
+                const metaParts = [];
+                if (hasPrice) metaParts.push(`$${Number(item.price).toFixed(2)}`);
+                if (hasRating) {
+                    const rc = item.rating_count !== null && item.rating_count !== undefined ? ` (${item.rating_count})` : '';
+                    metaParts.push(`${Number(item.rating).toFixed(1)}★${rc}`);
+                }
+                const mediaHtml = imageUrl
+                    ? `<img class="recommend-card-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(title)}" loading="lazy">`
+                    : `<div class="recommend-card-image recommend-card-image--empty">No image</div>`;
+                return `
+                    <div class="recommend-card">
+                        <div class="recommend-card-head">
+                            <span class="recommend-rank">#${rank}</span>
+                        </div>
+                        <div class="recommend-card-media">${mediaHtml}</div>
+                        <div class="recommend-card-title">${escapeHtml(title)}</div>
+                        <div class="recommend-card-meta">${metaParts.join(' · ') || 'No extra metadata'}</div>
+                        <a class="recommend-card-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open detail</a>
+                    </div>
+                `;
+            }).join('');
+            stage.style.display = 'block';
+            panel.style.display = 'block';
+            addLog('action', `✅ Top-${list.length} recommendations ready: ${top1.product_title || top1.product_id}`);
+        }
+
+        function showNoRecommendationFallback(exitCode) {
+            const stage = document.getElementById('recommend-stage');
+            const panel = document.getElementById('recommend-panel');
+            const meta = document.getElementById('recommend-meta');
+            const cards = document.getElementById('recommend-cards');
+            if (!stage || !panel || !meta || !cards) return;
+            stage.style.display = 'block';
+            panel.style.display = 'block';
+            const codeText = (exitCode === null || exitCode === undefined) ? 'unknown' : String(exitCode);
+            const reasonText = lastRunReason ? `, reason=${lastRunReason}` : '';
+            meta.textContent = `Run completed (exit_code=${codeText}${reasonText}) but no final recommendation was produced.`;
+            cards.innerHTML = `
+                <div class="recommend-card">
+                    <div class="recommend-card-head"><span class="recommend-rank">Info</span></div>
+                    <div class="recommend-card-title">No recommendation generated in this run.</div>
+                    <div class="recommend-card-meta">Try increasing max steps, relaxing constraints, or switching query/profile.</div>
+                </div>
+            `;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
         
         function updateScreenshot(screenshotData, url) {
@@ -298,8 +732,8 @@
         function addLog(level, message) {
             const log = document.getElementById('activity-log');
             
-            // 清除占位符
-            if (log.children.length === 1 && log.children[0].textContent.includes('等待')) {
+            // Clear placeholder
+            if (log.children.length === 1 && log.children[0].textContent.includes('Waiting')) {
                 log.innerHTML = '';
             }
             
@@ -324,6 +758,9 @@
             if (el) {
                 el.textContent = value;
             }
+            if (name === 'run_reason') {
+                lastRunReason = String(value || '').trim();
+            }
         }
         
         function updateConnectionStatus(status) {
@@ -336,6 +773,122 @@
                 updateMetric('time', `${elapsed}s`);
             }
         }, 1000);
+
+        // Interactive: enter a query and run the Agent
+        document.getElementById('run-btn').addEventListener('click', async () => {
+            const input = document.getElementById('query-input');
+            const query = (input?.value || '').trim();
+            const perception = document.querySelector('input[name="perception"]:checked')?.value || 'visual';
+            const btn = document.getElementById('run-btn');
+            const statusEl = document.getElementById('run-status');
+
+            if (!query) {
+                statusEl.textContent = 'Please enter a shopping request.';
+                statusEl.className = 'run-status error';
+                return;
+            }
+
+            btn.disabled = true;
+            statusEl.textContent = 'Starting...';
+            statusEl.className = 'run-status';
+
+            try {
+                const res = await fetch(withToken('/api/run-agent'), {
+                    method: 'POST',
+                    headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ query, perception })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    statusEl.textContent = 'Agent started.';
+                    statusEl.className = 'run-status success';
+                    startTime = Date.now();
+                    runStarted = true;
+                    gotRecommendation = false;
+                    actionCount = 0;
+                    document.getElementById('metric-actions').textContent = '0';
+                    document.getElementById('metric-step').textContent = 'Running';
+                    document.getElementById('metric-run_reason').textContent = '—';
+                    lastRunReason = '';
+                    document.getElementById('metric-decision-path').textContent = '—';
+                    const stage = document.getElementById('recommend-stage');
+                    if (stage) stage.style.display = 'none';
+                    const cards = document.getElementById('recommend-cards');
+                    if (cards) cards.innerHTML = '';
+                    const log = document.getElementById('activity-log');
+                    log.innerHTML = '';
+                    addLog('action', `▶ Started: "${query.slice(0, 50)}${query.length > 50 ? '...' : ''}" (${perception})`);
+                } else {
+                    statusEl.textContent = data.error || 'Failed to start the Agent.';
+                    statusEl.className = 'run-status error';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Request failed: ' + (e.message || 'Network error');
+                statusEl.className = 'run-status error';
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('stop-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('stop-btn');
+            const statusEl = document.getElementById('run-status');
+            btn.disabled = true;
+            try {
+                const res = await fetch(withToken('/api/stop-agent'), {
+                    method: 'POST',
+                    headers: buildAuthHeaders()
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    statusEl.textContent = 'Agent stopped.';
+                    statusEl.className = 'run-status success';
+                    document.getElementById('metric-step').textContent = 'Stopped';
+                    addLog('action', '■ Stop requested.');
+                } else {
+                    statusEl.textContent = data.error || 'Failed to stop the Agent.';
+                    statusEl.className = 'run-status error';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Stop request failed: ' + (e.message || 'Network error');
+                statusEl.className = 'run-status error';
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Press Enter to run
+        document.getElementById('query-input')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('run-btn').click();
+        });
+
+        // Poll Agent status and update final state
+        setInterval(async () => {
+            try {
+                const res = await fetch(withToken('/api/agent-status'), {
+                    headers: buildAuthHeaders()
+                });
+                const data = await res.json();
+                const statusEl = document.getElementById('run-status');
+                const stopBtn = document.getElementById('stop-btn');
+                if (stopBtn) stopBtn.disabled = !data.running;
+                if (!data.running && runStarted) {
+                    runStarted = false;
+                    const exitCode = data.exit_code;
+                    const ok = (exitCode === 0 || exitCode === null || exitCode === undefined);
+                    if (statusEl) {
+                        statusEl.textContent = ok
+                            ? 'Agent completed.'
+                            : `Agent completed with exit_code=${exitCode}.`;
+                        statusEl.className = ok ? 'run-status success' : 'run-status error';
+                    }
+                    document.getElementById('metric-step').textContent = gotRecommendation ? 'Completed' : 'Completed (no recommendation)';
+                    if (!gotRecommendation) {
+                        showNoRecommendationFallback(exitCode);
+                    }
+                }
+            } catch (_) {}
+        }, 3000);
         
         connectWebSocket();
     </script>

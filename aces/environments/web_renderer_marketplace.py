@@ -272,24 +272,11 @@ class WebRendererMarketplace(MarketplaceProvider):
         self.current_query = query
         
         # 简单文件名匹配（与 ACES v1 兼容）
-        json_file = self.datasets_dir / f"{query.lower().replace(' ', '_')}.json"
-        
-        products = []
-        if json_file.exists():
-            try:
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    products_data = json.load(f)
-                
-                for idx, data in enumerate(products_data):
-                    product = product_from_dict(
-                        data,
-                        index=idx,
-                        source="web_renderer",
-                        default_id_prefix=query,
-                    )
-                    products.append(product)
-            except Exception as e:
-                logger.error(f"Failed to load {json_file}: {e}")
+        category_key = query.lower().replace(" ", "_")
+        products = [
+            p for p in self.products
+            if str((p.raw_data or {}).get("category", "")).strip().lower() == category_key
+        ]
         
         # 排序
         if sort_by == "price_asc":
@@ -392,35 +379,68 @@ class WebRendererMarketplace(MarketplaceProvider):
     # ========================================================================
     # Private Helper Methods
     # ========================================================================
+
+    def _load_products_data_from_file(
+        self, json_file: Path, *, log_skip: bool = True
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Load one dataset file and validate it's list[dict]."""
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            if log_skip:
+                logger.error(f"Failed to load {json_file}: {e}")
+            return None
+
+        if not isinstance(data, list) or any(not isinstance(item, dict) for item in data):
+            if log_skip:
+                logger.warning(f"Skipping non-product dataset file: {json_file.name}")
+            return None
+        return data
     
     def _load_all_products(self) -> List[Product]:
         """从所有 JSON 文件加载商品。"""
         all_products = []
+        id_counts: Dict[str, int] = {}
+        duplicate_count = 0
         
         if not self.datasets_dir.exists():
             logger.warning(f"Datasets directory not found: {self.datasets_dir}")
             return []
         
         # 遍历所有 JSON 文件
-        for json_file in self.datasets_dir.glob("*.json"):
-            try:
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    products_data = json.load(f)
-                
-                category = json_file.stem  # 文件名作为类别
-                
-                for idx, data in enumerate(products_data):
-                    data_with_category = {"category": category, **data}
-                    product = product_from_dict(
-                        data_with_category,
-                        index=idx,
-                        source="web_renderer",
-                        category=category,
-                    )
-                    all_products.append(product)
-            
-            except Exception as e:
-                logger.error(f"Failed to load {json_file}: {e}")
+        for json_file in sorted(self.datasets_dir.glob("*.json")):
+            products_data = self._load_products_data_from_file(json_file, log_skip=True)
+            if products_data is None:
                 continue
-        
+
+            category = json_file.stem  # 文件名作为类别
+
+            for idx, data in enumerate(products_data):
+                data_with_category = {"category": category, **data}
+                product = product_from_dict(
+                    data_with_category,
+                    index=idx,
+                    source="web_renderer",
+                    category=category,
+                )
+                base_id = str(product.id)
+                seen = id_counts.get(base_id, 0)
+                id_counts[base_id] = seen + 1
+                if seen > 0:
+                    duplicate_count += 1
+                    unique_id = f"{base_id}__dup{seen+1}"
+                    raw = dict(product.raw_data or {})
+                    raw["original_id"] = base_id
+                    raw["dedup_id"] = unique_id
+                    raw["dedup_rank"] = seen + 1
+                    product.id = unique_id
+                    product.raw_data = raw
+                all_products.append(product)
+
+        if duplicate_count:
+            logger.warning(
+                "Detected %d duplicate product IDs; auto-renamed to unique IDs during load.",
+                duplicate_count,
+            )
         return all_products

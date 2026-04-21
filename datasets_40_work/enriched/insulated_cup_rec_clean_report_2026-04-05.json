@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-04-05T10:48:49",
+  "pool_count": 4464,
+  "dedup_count": 1201,
+  "valid_count": 559,
+  "final_count": 200,
+  "selected_window": [
+    11.99,
+    21.99,
+    255,
+    10
+  ],
+  "removed": {
+    "no_vessel": 46,
+    "no_insulated_signal_in_title": 357,
+    "accessory": 217,
+    "non_insulated_drinkware": 22
+  },
+  "audit_suspect_count": 0,
+  "audit_samples": []
+}

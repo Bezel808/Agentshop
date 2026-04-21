@@ -1,0 +1,64 @@
+{
+  "timestamp": "20260401_151207",
+  "source": "datasets_40_work",
+  "old_raw": {
+    "count": 161,
+    "accessory_like": 128,
+    "accessory_ratio": 0.7950310559006211,
+    "with_reviews": 11,
+    "with_images": 161,
+    "sample_accessory_titles": [
+      "3 Pack Screen Protector Compatible Fitbit Versa 2 Case, GHIJKL Ultra-Thin Slim Soft TPU Protective Case All-Around Full Cover Bumper Shell for Fitbit Versa 2 Smartwatch, Black, Silver, Blue",
+      "Garmin 010-02172-31 Vivoactive 4S, Smaller-Sized GPS Smartwatch, Features Music, Body Energy Monitoring, Animated Workouts, Pulse Ox Sensors and More, Light Gold with Light Pink Band",
+      "Wepro Replacement Bands Compatible with Fitbit Versa SmartWatch, Versa 2 and Versa Lite SE Sports Watch Band for Women Men, Small, Large",
+      "AK Sports Bands Compatible for Fitbit Versa/Versa 2/Versa SE, Soft Multi-Colors Replacement Wristbands for Fitbit Versa Lite Smart Watch Women Men",
+      "amBand Compatible for Fitbit Versa 4/3/2/ Fitbit Versa Lite/Fitbit Sense 2/ Fitbit Sense Bands with Case, Protective Smartwatch Case Strap Rugged Sport Protector Wristbands Men Black",
+      "Maledan Bands Compatible with Fitbit Charge 3 and Charge 4, Breathable Sport Band Replacement Wristbands with Air Holes for Charge 4/ Charge 3/ Charge 3 SE Fitness Tracker Women Men, 3-Pack",
+      "WFEAGL for Fitbit Versa Band, Top Grain Leather Band for Fitbit Versa/Versa 2 /Versa Lite/Versa SE Fitness Smart Watch (Light Gray Band+Silver Buckle)",
+      "Apple Watch Series 8 [GPS 45mm] Smart Watch w/Starlight Aluminum Case with Starlight Sport Band - M/L. Fitness Tracker, Blood Oxygen & ECG Apps, Always-On Retina Display, Water Resistant"
+    ]
+  },
+  "old_enriched": {
+    "count": 94,
+    "accessory_like": 63,
+    "accessory_ratio": 0.6702127659574468,
+    "with_reviews": 94,
+    "with_images": 94,
+    "sample_accessory_titles": [
+      "Garmin 010-02172-31 Vivoactive 4S, Smaller-Sized GPS Smartwatch, Features Music, Body Energy Monitoring, Animated Workouts, Pulse Ox Sensors and More, Light Gold with Light Pink Band",
+      "Wepro Replacement Bands Compatible with Fitbit Versa SmartWatch, Versa 2 and Versa Lite SE Sports Watch Band for Women Men, Small, Large",
+      "AK Sports Bands Compatible for Fitbit Versa/Versa 2/Versa SE, Soft Multi-Colors Replacement Wristbands for Fitbit Versa Lite Smart Watch Women Men",
+      "amBand Compatible for Fitbit Versa 4/3/2/ Fitbit Versa Lite/Fitbit Sense 2/ Fitbit Sense Bands with Case, Protective Smartwatch Case Strap Rugged Sport Protector Wristbands Men Black",
+      "Maledan Bands Compatible with Fitbit Charge 3 and Charge 4, Breathable Sport Band Replacement Wristbands with Air Holes for Charge 4/ Charge 3/ Charge 3 SE Fitness Tracker Women Men, 3-Pack",
+      "WFEAGL for Fitbit Versa Band, Top Grain Leather Band for Fitbit Versa/Versa 2 /Versa Lite/Versa SE Fitness Smart Watch (Light Gray Band+Silver Buckle)",
+      "Apple Watch Series 8 [GPS 45mm] Smart Watch w/Starlight Aluminum Case with Starlight Sport Band - M/L. Fitness Tracker, Blood Oxygen & ECG Apps, Always-On Retina Display, Water Resistant",
+      "Gear S3 Frontier Band XL/Large, Oitom Premium Solid Stainless Steel Watch Bands Link Bracelet Strap for Samsung Gear S3 Classic Gear S3 Frontier Galaxy Watch 46mm Smart Watch Fitness Black"
+    ]
+  },
+  "new_raw": {
+    "count": 107,
+    "accessory_like": 0,
+    "accessory_ratio": 0.0,
+    "with_reviews": 0,
+    "with_images": 107,
+    "sample_accessory_titles": []
+  },
+  "new_enriched": {
+    "count": 105,
+    "accessory_like": 0,
+    "accessory_ratio": 0.0,
+    "with_reviews": 105,
+    "with_images": 105,
+    "sample_accessory_titles": []
+  },
+  "final_counts": {
+    "raw": 107,
+    "enriched": 105
+  },
+  "rebuild_steps": [
+    "expand-by-keyword smart_watch with accessory pre-filter (scan_limit=180000)",
+    "enrich with review/image completion (review_scan_limit=350000)",
+    "filter-quality with strengthened smart_watch rules",
+    "final raw accessory trim for charging-station residuals"
+  ]
+}
