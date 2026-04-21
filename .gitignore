@@ -36,10 +36,13 @@ ENV/
 # Experiment outputs
 experiment_logs/
 experiment_results/
+analysis/
+analysis_outputs/
 results/
 artifacts/
 screenshots/
 *.gif
+.cache/
 
 # Regenerable datasets (from manage_datasets enrich --output-dir)
 datasets_extended/
